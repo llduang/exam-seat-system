@@ -1,0 +1,1808 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>考场座位分配系统</title>
+    <script src="https://cdn.jsdelivr.net/npm/xlsx-js-style@1.2.0/dist/xlsx.bundle.js"></script>
+    <style>
+        * {
+            box-sizing: border-box;
+            font-family: 'Microsoft YaHei', sans-serif;
+        }
+        body {
+            background-color: #f5f7fa;
+            margin: 0;
+            padding: 20px;
+            color: #333;
+        }
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            background-color: #fff;
+            border-radius: 10px;
+            box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+            padding: 30px;
+        }
+        h1 {
+            color: #2c3e50;
+            text-align: center;
+            margin-bottom: 30px;
+        }
+        .form-group {
+            margin-bottom: 20px;
+        }
+        label {
+            display: block;
+            margin-bottom: 8px;
+            font-weight: bold;
+            color: #555;
+        }
+        input[type="number"], input[type="text"], input[type="file"], select {
+            width: 100%;
+            padding: 12px;
+            border: 1px solid #ddd;
+            border-radius: 5px;
+            font-size: 16px;
+        }
+        .button-container {
+            display: flex;
+            justify-content: center;
+            margin: 30px 0;
+        }
+        button {
+            background-color: #3498db;
+            color: white;
+            border: none;
+            padding: 12px 25px;
+            font-size: 16px;
+            border-radius: 5px;
+            cursor: pointer;
+            transition: background-color 0.3s;
+        }
+        button:hover {
+            background-color: #2980b9;
+        }
+        button:disabled {
+            background-color: #95a5a6;
+            cursor: not-allowed;
+        }
+        .result-container {
+            margin-top: 30px;
+            display: none;
+        }
+        .result-table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 20px;
+        }
+        .result-table th, .result-table td {
+            border: 1px solid #ddd;
+            padding: 12px;
+            text-align: left;
+        }
+        .result-table th {
+            background-color: #f2f2f2;
+        }
+        .result-table tr:nth-child(even) {
+            background-color: #f9f9f9;
+        }
+        .download-container {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 15px;
+            margin-top: 20px;
+        }
+        .download-btn {
+            background-color: #27ae60;
+            color: white;
+            text-decoration: none;
+            padding: 10px 20px;
+            border-radius: 5px;
+            display: inline-block;
+            transition: background-color 0.3s;
+        }
+        .download-btn:hover {
+            background-color: #219653;
+        }
+        .status-message {
+            padding: 15px;
+            border-radius: 5px;
+            margin: 20px 0;
+            display: none;
+        }
+        .success {
+            background-color: #d4edda;
+            color: #155724;
+            border: 1px solid #c3e6cb;
+        }
+        .error {
+            background-color: #f8d7da;
+            color: #721c24;
+            border: 1px solid #f5c6cb;
+        }
+        .info {
+            background-color: #d1ecf1;
+            color: #0c5460;
+            border: 1px solid #bee5eb;
+        }
+        .classroom-settings {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 20px;
+        }
+        .classroom-settings .form-group {
+            flex: 1;
+            min-width: 200px;
+        }
+        .seat-order-container {
+            margin-top: 10px;
+        }
+        .seat-order-item {
+            display: inline-block;
+            width: 40px;
+            height: 40px;
+            line-height: 40px;
+            text-align: center;
+            margin: 5px;
+            background-color: #f1f1f1;
+            border-radius: 5px;
+        }
+        .loading {
+            display: none;
+            text-align: center;
+            margin: 20px 0;
+        }
+        .spinner {
+            border: 5px solid #f3f3f3;
+            border-top: 5px solid #3498db;
+            border-radius: 50%;
+            width: 40px;
+            height: 40px;
+            animation: spin 1s linear infinite;
+            margin: 0 auto;
+        }
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+        .format-selector {
+            display: flex;
+            gap: 20px;
+            margin-bottom: 20px;
+        }
+        .format-option {
+            flex: 1;
+            padding: 15px;
+            border: 1px solid #ddd;
+            border-radius: 5px;
+            cursor: pointer;
+            transition: all 0.3s;
+        }
+        .format-option:hover {
+            background-color: #f9f9f9;
+        }
+        .format-option.selected {
+            border-color: #3498db;
+            background-color: #e3f2fd;
+        }
+        .format-option h3 {
+            margin-top: 0;
+            color: #3498db;
+        }
+        .column-mapping {
+            margin-top: 15px;
+            display: none;
+        }
+        .column-mapping .form-group {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+        .column-mapping label {
+            flex: 1;
+            margin-bottom: 0;
+        }
+        .column-mapping select {
+            flex: 2;
+        }
+        .tabs {
+            display: flex;
+            border-bottom: 1px solid #ddd;
+            margin-bottom: 20px;
+        }
+        .tab {
+            padding: 10px 20px;
+            cursor: pointer;
+            background-color: #f1f1f1;
+            border: 1px solid #ddd;
+            border-bottom: none;
+            border-radius: 5px 5px 0 0;
+            margin-right: 5px;
+        }
+        .tab.active {
+            background-color: #fff;
+            border-bottom: 1px solid #fff;
+            margin-bottom: -1px;
+        }
+        .tab-content {
+            display: none;
+        }
+        .tab-content.active {
+            display: block;
+        }
+        .stats-container {
+            margin-top: 30px;
+            background-color: #f8f9fa;
+            border-radius: 8px;
+            padding: 20px;
+            border: 1px solid #e9ecef;
+        }
+        .stats-container h3 {
+            margin-top: 0;
+            color: #495057;
+            border-bottom: 1px solid #dee2e6;
+            padding-bottom: 10px;
+        }
+        .chart-container {
+            margin-top: 20px;
+            height: 300px;
+            position: relative;
+        }
+        .stats-summary {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 15px;
+            margin-top: 20px;
+        }
+        .stat-card {
+            flex: 1;
+            min-width: 200px;
+            background-color: white;
+            border-radius: 8px;
+            padding: 15px;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+            text-align: center;
+        }
+        .stat-card h4 {
+            margin-top: 0;
+            color: #6c757d;
+            font-size: 14px;
+        }
+        .stat-card .stat-value {
+            font-size: 28px;
+            font-weight: bold;
+            color: #3498db;
+        }
+        .help-text {
+            font-size: 12px;
+            color: #6c757d;
+            margin-top: 5px;
+        }
+        .unassigned-container {
+            margin-top: 20px;
+            background-color: #fff3cd;
+            border: 1px solid #ffeeba;
+            border-radius: 5px;
+            padding: 15px;
+        }
+        .unassigned-container h4 {
+            margin-top: 0;
+            color: #856404;
+        }
+        .unassigned-list {
+            max-height: 200px;
+            overflow-y: auto;
+        }
+        
+        /* 未分配学生处理模态框样式 */
+        .modal {
+            display: none;
+            position: fixed;
+            z-index: 1000;
+            left: 0;
+            top: 0;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(0,0,0,0.5);
+        }
+        .modal-content {
+            background-color: #fff;
+            margin: 50px auto;
+            padding: 30px;
+            border-radius: 10px;
+            width: 90%;
+            max-width: 800px;
+            max-height: 80vh;
+            overflow-y: auto;
+        }
+        .modal-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 20px;
+            border-bottom: 1px solid #eee;
+            padding-bottom: 15px;
+        }
+        .modal-header h2 {
+            margin: 0;
+            color: #2c3e50;
+        }
+        .close-btn {
+            font-size: 28px;
+            font-weight: bold;
+            color: #aaa;
+            cursor: pointer;
+            background: none;
+            border: none;
+            padding: 0;
+        }
+        .close-btn:hover {
+            color: #000;
+        }
+        .unassigned-student-item {
+            background-color: #f8f9fa;
+            border: 1px solid #dee2e6;
+            border-radius: 8px;
+            padding: 15px;
+            margin-bottom: 15px;
+        }
+        .student-info {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 10px;
+        }
+        .student-name {
+            font-weight: bold;
+            font-size: 16px;
+        }
+        .student-class {
+            color: #6c757d;
+        }
+        .assignment-options {
+            display: flex;
+            gap: 15px;
+            align-items: center;
+        }
+        .assignment-options select {
+            flex: 1;
+            max-width: 150px;
+        }
+        .assign-btn {
+            background-color: #28a745;
+            color: white;
+            border: none;
+            padding: 8px 15px;
+            border-radius: 5px;
+            cursor: pointer;
+            font-size: 14px;
+        }
+        .assign-btn:hover {
+            background-color: #218838;
+        }
+        .assign-btn:disabled {
+            background-color: #6c757d;
+            cursor: not-allowed;
+        }
+        .skip-btn {
+            background-color: #dc3545;
+            color: white;
+            border: none;
+            padding: 8px 15px;
+            border-radius: 5px;
+            cursor: pointer;
+            font-size: 14px;
+        }
+        .skip-btn:hover {
+            background-color: #c82333;
+        }
+        .modal-footer {
+            display: flex;
+            justify-content: space-between;
+            margin-top: 20px;
+            padding-top: 15px;
+            border-top: 1px solid #eee;
+        }
+        .progress-info {
+            color: #6c757d;
+            font-size: 14px;
+        }
+        .finish-btn {
+            background-color: #007bff;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 5px;
+            cursor: pointer;
+            font-size: 16px;
+        }
+        .finish-btn:hover {
+            background-color: #0069d9;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>考场座位分配系统</h1>
+        
+        <div class="form-group">
+            <label for="excelFile">上传学生名单Excel文件：</label>
+            <input type="file" id="excelFile" accept=".xlsx, .xls">
+        </div>
+        
+        <div class="form-group">
+            <label>选择Excel文件格式：</label>
+            <div class="format-selector">
+                <div class="format-option selected" data-format="multi-sheet">
+                    <h3>多工作表格式</h3>
+                    <p>每个班级一个工作表，第一列为学生姓名</p>
+                </div>
+                <div class="format-option" data-format="single-sheet">
+                    <h3>单工作表格式</h3>
+                    <p>一个工作表包含所有学生，有"姓名"和"班级"列</p>
+                </div>
+            </div>
+            
+            <div class="column-mapping" id="columnMapping">
+                <div class="form-group">
+                    <label for="nameColumn">姓名列：</label>
+                    <select id="nameColumn">
+                        <option value="">请选择列</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label for="classColumn">班级列：</label>
+                    <select id="classColumn">
+                        <option value="">请选择列</option>
+                    </select>
+                </div>
+            </div>
+        </div>
+        
+        <div class="classroom-settings">
+            <div class="form-group">
+                <label for="classroomCount">考场数量：</label>
+                <input type="number" id="classroomCount" min="1" value="18">
+            </div>
+            
+            <div class="form-group">
+                <label for="seatCount">每个考场座位数：</label>
+                <input type="number" id="seatCount" min="1" value="25">
+            </div>
+            
+            <div class="form-group">
+                <label for="examPrefix">考号前缀：</label>
+                <input type="text" id="examPrefix" value="806" maxlength="10">
+                <div class="help-text">考号前缀将作为每个考号的开头部分，如"806"或"2025"</div>
+            </div>
+        </div>
+        
+        <div class="form-group">
+            <label>座位号排列顺序：</label>
+            <div class="seat-order-container" id="seatOrderContainer">
+                <!-- 座位号将在这里动态生成 -->
+            </div>
+        </div>
+        
+        <div class="button-container">
+            <button id="generateBtn">生成考场分配表</button>
+        </div>
+        
+        <div class="loading" id="loading">
+            <div class="spinner"></div>
+            <p>正在处理数据，请稍候...</p>
+        </div>
+        
+        <div class="status-message" id="statusMessage"></div>
+        
+        <div class="result-container" id="resultContainer">
+            <h2>考场分配结果</h2>
+            
+            <div class="tabs">
+                <div class="tab active" data-tab="preview">预览</div>
+                <div class="tab" data-tab="download">下载</div>
+                <div class="tab" data-tab="statistics">统计</div>
+            </div>
+            
+            <div class="tab-content active" id="previewTab">
+                <div class="result-table-container">
+                    <table class="result-table" id="resultTable">
+                        <thead>
+                            <tr>
+                                <th>姓名</th>
+                                <th>考场号</th>
+                                <th>座位号</th>
+                                <th>班级</th>
+                                <th>考号</th>
+                            </tr>
+                        </thead>
+                        <tbody id="resultTableBody">
+                            <!-- 结果将在这里动态生成 -->
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+            
+            <div class="tab-content" id="downloadTab">
+                <h3>下载分配表：</h3>
+                <div class="download-container" id="downloadContainer">
+                    <!-- 下载按钮将在这里动态生成 -->
+                </div>
+                
+                <h3>高级下载选项：</h3>
+                <div class="form-group">
+                    <button id="downloadAllBtn">下载完整分配表（包含所有工作表）</button>
+                </div>
+                
+                <div class="unassigned-container" id="unassignedContainer" style="display: none;">
+                    <h4>未分配学生名单：</h4>
+                    <div class="unassigned-list" id="unassignedList">
+                        <!-- 未分配学生列表将在这里动态生成 -->
+                    </div>
+                </div>
+            </div>
+            
+            <div class="tab-content" id="statisticsTab">
+                <div class="stats-container">
+                    <h3>班级人数统计</h3>
+                    
+                    <div class="stats-summary">
+                        <div class="stat-card">
+                            <h4>总班级数</h4>
+                            <div class="stat-value" id="totalClasses">0</div>
+                        </div>
+                        <div class="stat-card">
+                            <h4>总学生数</h4>
+                            <div class="stat-value" id="totalStudents">0</div>
+                        </div>
+                        <div class="stat-card">
+                            <h4>已分配座位</h4>
+                            <div class="stat-value" id="assignedSeats">0</div>
+                        </div>
+                        <div class="stat-card">
+                            <h4>未分配座位</h4>
+                            <div class="stat-value" id="unassignedSeats">0</div>
+                        </div>
+                    </div>
+                    
+                    <div class="chart-container">
+                        <canvas id="classChart"></canvas>
+                    </div>
+                    
+                    <div class="result-table-container" style="margin-top: 20px;">
+                        <table class="result-table" id="statsTable">
+                            <thead>
+                                <tr>
+                                    <th>班级</th>
+                                    <th>总人数</th>
+                                    <th>已分配</th>
+                                    <th>未分配</th>
+                                    <th>分配率</th>
+                                </tr>
+                            </thead>
+                            <tbody id="statsTableBody">
+                                <!-- 统计结果将在这里动态生成 -->
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- 未分配学生处理模态框 -->
+    <div id="unassignedModal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2>处理未分配学生</h2>
+                <button class="close-btn" onclick="closeUnassignedModal()">&times;</button>
+            </div>
+            <div class="modal-body" id="modalBody">
+                <!-- 未分配学生列表将在这里动态生成 -->
+            </div>
+            <div class="modal-footer">
+                <div class="progress-info" id="progressInfo">
+                    处理进度：0/0
+                </div>
+                <button class="finish-btn" id="finishBtn" onclick="finishUnassignedAssignment()" style="display: none;">
+                    完成分配
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- 引入Chart.js用于绘制图表 -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    
+    <script>
+        // 全局变量
+        let selectedFormat = 'multi-sheet';
+        let columnHeaders = [];
+        let assignments = [];
+        let classNames = [];
+        let classStats = {}; // 存储班级统计信息
+        let unassignedStudents = []; // 存储未分配的学生信息
+        let currentUnassignedIndex = 0; // 当前处理的未分配学生索引
+        let additionalSeats = {}; // 存储额外添加的座位信息
+        let classNameToNumber = {}; // 班级名称到数字标识的映射
+        
+        // 初始化座位号显示
+        function initializeSeatOrder() {
+            const seatCount = parseInt(document.getElementById('seatCount').value);
+            const container = document.getElementById('seatOrderContainer');
+            container.innerHTML = '';
+            
+            for (let i = 1; i <= seatCount; i++) {
+                const seatItem = document.createElement('div');
+                seatItem.className = 'seat-order-item';
+                seatItem.textContent = i;
+                container.appendChild(seatItem);
+            }
+        }
+
+        // 显示状态消息
+        function showStatusMessage(message, type) {
+            const statusElement = document.getElementById('statusMessage');
+            statusElement.innerHTML = message;
+            statusElement.className = `status-message ${type}`;
+            statusElement.style.display = 'block';
+            
+            // 5秒后自动隐藏消息
+            setTimeout(() => {
+                statusElement.style.display = 'none';
+            }, 5000);
+        }
+
+        // 格式选择器事件处理
+        document.querySelectorAll('.format-option').forEach(option => {
+            option.addEventListener('click', function() {
+                document.querySelectorAll('.format-option').forEach(opt => {
+                    opt.classList.remove('selected');
+                });
+                this.classList.add('selected');
+                selectedFormat = this.dataset.format;
+                
+                // 显示或隐藏列映射选项
+                const columnMapping = document.getElementById('columnMapping');
+                if (selectedFormat === 'single-sheet') {
+                    columnMapping.style.display = 'block';
+                } else {
+                    columnMapping.style.display = 'none';
+                }
+            });
+        });
+
+        // 标签页切换
+        document.querySelectorAll('.tab').forEach(tab => {
+            tab.addEventListener('click', function() {
+                const tabName = this.dataset.tab;
+                
+                // 更新标签状态
+                document.querySelectorAll('.tab').forEach(t => {
+                    t.classList.remove('active');
+                });
+                this.classList.add('active');
+                
+                // 更新内容显示
+                document.querySelectorAll('.tab-content').forEach(content => {
+                    content.classList.remove('active');
+                });
+                document.getElementById(`${tabName}Tab`).classList.add('active');
+                
+                // 如果切换到统计标签页，更新统计信息
+                if (tabName === 'statistics' && assignments.length > 0) {
+                    updateStatistics();
+                }
+            });
+        });
+
+        // 文件上传处理
+        document.getElementById('excelFile').addEventListener('change', function(e) {
+            const file = e.target.files[0];
+            if (!file) return;
+            
+            const reader = new FileReader();
+            reader.onload = function(event) {
+                try {
+                    const data = new Uint8Array(event.target.result);
+                    const workbook = XLSX.read(data, { type: 'array' });
+                    
+                    // 如果是单工作表格式，获取列标题
+                    if (selectedFormat === 'single-sheet') {
+                        const firstSheetName = workbook.SheetNames[0];
+                        const worksheet = workbook.Sheets[firstSheetName];
+                        const jsonData = XLSX.utils.sheet_to_json(worksheet, { header: 1 });
+                        
+                        if (jsonData.length > 0) {
+                            // 确保第一行是数组
+                            const firstRow = Array.isArray(jsonData[0]) ? jsonData[0] : [];
+                            columnHeaders = firstRow.map(header => {
+                                // 确保每个标题都是字符串
+                                if (header === undefined || header === null) return '';
+                                return String(header);
+                            });
+                            
+                            // 更新列选择下拉框
+                            const nameColumnSelect = document.getElementById('nameColumn');
+                            const classColumnSelect = document.getElementById('classColumn');
+                            
+                            nameColumnSelect.innerHTML = '<option value="">请选择列</option>';
+                            classColumnSelect.innerHTML = '<option value="">请选择列</option>';
+                            
+                            columnHeaders.forEach((header, index) => {
+                                const headerText = header || `列 ${index + 1}`;
+                                const nameOption = document.createElement('option');
+                                nameOption.value = index;
+                                nameOption.textContent = headerText;
+                                nameColumnSelect.appendChild(nameOption);
+                                
+                                const classOption = document.createElement('option');
+                                classOption.value = index;
+                                classOption.textContent = headerText;
+                                classColumnSelect.appendChild(classOption);
+                            });
+                            
+                            // 尝试自动匹配列
+                            const nameIndex = columnHeaders.findIndex(h => {
+                                if (!h) return false;
+                                try {
+                                    const headerStr = String(h).toLowerCase();
+                                    return headerStr.includes('姓名') || headerStr.includes('名字') || headerStr.includes('name');
+                                } catch (e) {
+                                    return false;
+                                }
+                            });
+                            const classIndex = columnHeaders.findIndex(h => {
+                                if (!h) return false;
+                                try {
+                                    const headerStr = String(h).toLowerCase();
+                                    return headerStr.includes('班级') || headerStr.includes('级') || headerStr.includes('class');
+                                } catch (e) {
+                                    return false;
+                                }
+                            });
+                            
+                            if (nameIndex !== -1) nameColumnSelect.value = nameIndex;
+                            if (classIndex !== -1) classColumnSelect.value = classIndex;
+                        }
+                    }
+                    
+                    showStatusMessage('文件已成功加载，可以开始生成考场分配表', 'success');
+                } catch (error) {
+                    showStatusMessage('读取文件时出错: ' + error.message, 'error');
+                }
+            };
+            reader.readAsArrayBuffer(file);
+        });
+
+        // 生成考场分配表
+        function generateAssignment() {
+            const fileInput = document.getElementById('excelFile');
+            const classroomCount = parseInt(document.getElementById('classroomCount').value);
+            const seatCount = parseInt(document.getElementById('seatCount').value);
+            const examPrefix = document.getElementById('examPrefix').value.trim();
+            
+            if (!fileInput.files.length) {
+                showStatusMessage('请先上传学生名单Excel文件', 'error');
+                return;
+            }
+            
+            if (classroomCount <= 0 || seatCount <= 0) {
+                showStatusMessage('考场数量和座位数必须大于0', 'error');
+                return;
+            }
+            
+            if (!examPrefix) {
+                showStatusMessage('请输入考号前缀', 'error');
+                return;
+            }
+            
+            if (selectedFormat === 'single-sheet') {
+                const nameColumn = document.getElementById('nameColumn').value;
+                const classColumn = document.getElementById('classColumn').value;
+                
+                if (!nameColumn || !classColumn) {
+                    showStatusMessage('请选择姓名列和班级列', 'error');
+                    return;
+                }
+            }
+            
+            const loadingElement = document.getElementById('loading');
+            loadingElement.style.display = 'block';
+            
+            const file = fileInput.files[0];
+            const reader = new FileReader();
+            
+            reader.onload = function(e) {
+                try {
+                    const data = new Uint8Array(e.target.result);
+                    const workbook = XLSX.read(data, { type: 'array' });
+                    
+                    // 根据选择的格式读取数据
+                    let classData = {};
+                    let classSizes = {};
+                    unassignedStudents = []; // 重置未分配学生列表
+                    additionalSeats = {}; // 重置额外座位信息
+                    
+                    if (selectedFormat === 'multi-sheet') {
+                        // 多工作表格式：每个工作表代表一个班级
+                        classNames = workbook.SheetNames;
+                        if (classNames.length === 0) {
+                            showStatusMessage('Excel文件中没有找到任何班级数据', 'error');
+                            loadingElement.style.display = 'none';
+                            return;
+                        }
+                        
+                        // 【修复】对班级名称进行排序，确保顺序一致
+                        classNames.sort();
+                        
+                        // 读取每个班级的数据
+                        classNames.forEach(className => {
+                            const worksheet = workbook.Sheets[className];
+                            const jsonData = XLSX.utils.sheet_to_json(worksheet, { header: 1 });
+                            
+                            // 假设第一行是标题，第二行开始是学生数据
+                            const students = [];
+                            for (let i = 1; i < jsonData.length; i++) {
+                                // 确保行是数组
+                                const row = Array.isArray(jsonData[i]) ? jsonData[i] : [];
+                                // 确保单元格值存在且转换为字符串
+                                if (row.length > 0 && row[0] !== undefined && row[0] !== null) {
+                                    try {
+                                        const studentName = String(row[0]).trim();
+                                        if (studentName) {
+                                            students.push(studentName);
+                                        }
+                                    } catch (e) {
+                                        console.error('处理学生姓名时出错:', e);
+                                    }
+                                }
+                            }
+                            
+                            classData[className] = students;
+                            classSizes[className] = students.length;
+                        });
+                    } else {
+                        // 单工作表格式：一个工作表包含所有学生
+                        const firstSheetName = workbook.SheetNames[0];
+                        const worksheet = workbook.Sheets[firstSheetName];
+                        const jsonData = XLSX.utils.sheet_to_json(worksheet, { header: 1 });
+                        
+                        const nameColumnIndex = parseInt(document.getElementById('nameColumn').value);
+                        const classColumnIndex = parseInt(document.getElementById('classColumn').value);
+                        
+                        // 收集所有班级名称
+                        const uniqueClasses = new Set();
+                        for (let i = 1; i < jsonData.length; i++) {
+                            // 确保行是数组
+                            const row = Array.isArray(jsonData[i]) ? jsonData[i] : [];
+                            if (row.length > Math.max(nameColumnIndex, classColumnIndex)) {
+                                try {
+                                    const classValue = row[classColumnIndex];
+                                    if (classValue !== undefined && classValue !== null) {
+                                        const className = String(classValue).trim();
+                                        if (className) {
+                                            uniqueClasses.add(className);
+                                        }
+                                    }
+                                } catch (e) {
+                                    console.error('处理班级名称时出错:', e);
+                                }
+                            }
+                        }
+                        
+                        classNames = Array.from(uniqueClasses);
+                        
+                        // 【修复】对班级名称进行排序，确保顺序一致
+                        classNames.sort();
+                        
+                        // 初始化班级数据
+                        classNames.forEach(className => {
+                            classData[className] = [];
+                        });
+                        
+                        // 读取学生数据
+                        for (let i = 1; i < jsonData.length; i++) {
+                            // 确保行是数组
+                            const row = Array.isArray(jsonData[i]) ? jsonData[i] : [];
+                            if (row.length > Math.max(nameColumnIndex, classColumnIndex)) {
+                                try {
+                                    const nameValue = row[nameColumnIndex];
+                                    const classValue = row[classColumnIndex];
+                                    
+                                    if (nameValue !== undefined && nameValue !== null && 
+                                        classValue !== undefined && classValue !== null) {
+                                        const name = String(nameValue).trim();
+                                        const className = String(classValue).trim();
+                                        
+                                        if (name && className && classData[className]) {
+                                            classData[className].push(name);
+                                        }
+                                    }
+                                } catch (e) {
+                                    console.error('处理学生数据时出错:', e);
+                                }
+                            }
+                        }
+                        
+                        // 计算每个班级的学生数量
+                        classNames.forEach(className => {
+                            classSizes[className] = classData[className].length;
+                        });
+                    }
+                    
+                    // 创建班级名称到数字标识的映射字典
+                    classNameToNumber = {};
+                    classNames.forEach((name, index) => {
+                        classNameToNumber[name] = (index + 1).toString().padStart(2, '0');
+                    });
+                    
+                    // 生成座位号列表
+                    const seatOrder = Array.from({ length: seatCount }, (_, i) => i + 1);
+                    const studentsPerClassroom = seatOrder.length;
+                    const totalSeats = classroomCount * studentsPerClassroom;
+                    
+                    // 按顺序给学生分配考场和座位
+                    const allStudents = [];
+                    classNames.forEach(className => {
+                        classData[className].forEach(student => {
+                            allStudents.push({ name: student, class: className });
+                        });
+                    });
+                    
+                    const totalStudents = allStudents.length;
+                    
+                    // 生成分配信息
+                    assignments = [];
+                    const classCounters = {};
+                    classNames.forEach(className => {
+                        classCounters[className] = 0;
+                    });
+                    
+                    let seatCounter = 0;
+                    
+                    // 第一轮分配：按班级顺序循环分配
+                    for (let i = 0; i < Math.min(totalStudents, totalSeats); i++) {
+                        const classIdx = i % classNames.length;
+                        const className = classNames[classIdx];
+                        
+                        if (classCounters[className] < classSizes[className]) {
+                            const studentName = classData[className][classCounters[className]];
+                            classCounters[className]++;
+                            
+                            // 计算考场号和座位号
+                            const classroomNumber = Math.floor(seatCounter / studentsPerClassroom) + 1;
+                            const seatNumber = seatOrder[seatCounter % studentsPerClassroom];
+                            
+                            // 生成考号 格式为"前缀 + 班级标识 + 考场号 + 座位号"
+                            const examNumber = `${examPrefix}${classNameToNumber[className]}${classroomNumber.toString().padStart(2, '0')}${seatNumber.toString().padStart(2, '0')}`;
+                            
+                            // 存储分配结果
+                            assignments.push({
+                                name: studentName,
+                                classroom: classroomNumber,
+                                seat: seatNumber,
+                                class: className,
+                                examNumber: examNumber
+                            });
+                            
+                            seatCounter++;
+                        }
+                    }
+                    
+                    // 计算每个班级未分配的学生数
+                    const unassignedStudentsCount = {};
+                    classNames.forEach(className => {
+                        unassignedStudentsCount[className] = classSizes[className] - classCounters[className];
+                    });
+                    
+                    // 若有班级存在未分配学生，继续分配直到考场无剩余座位
+                    while (seatCounter < totalSeats && Object.values(unassignedStudentsCount).some(count => count > 0)) {
+                        for (const className of classNames) {
+                            if (unassignedStudentsCount[className] > 0) {
+                                const studentName = classData[className][classCounters[className]];
+                                classCounters[className]++;
+                                unassignedStudentsCount[className]--;
+                                
+                                // 计算考场号和座位号
+                                const classroomNumber = Math.floor(seatCounter / studentsPerClassroom) + 1;
+                                let seatNumber = seatOrder[seatCounter % studentsPerClassroom];
+                                
+                                // 检查是否会与同班级相邻，若相邻则调整座位号
+                                if (assignments.length > 0) {
+                                    const lastAssignment = assignments[assignments.length - 1];
+                                    if (lastAssignment.class === className && seatNumber === lastAssignment.seat) {
+                                        seatNumber = (seatNumber % studentsPerClassroom) + 1;
+                                    }
+                                }
+                                
+                                // 生成考号
+                                const examNumber = `${examPrefix}${classNameToNumber[className]}${classroomNumber.toString().padStart(2, '0')}${seatNumber.toString().padStart(2, '0')}`;
+                                
+                                // 存储分配结果
+                                assignments.push({
+                                    name: studentName,
+                                    classroom: classroomNumber,
+                                    seat: seatNumber,
+                                    class: className,
+                                    examNumber: examNumber
+                                });
+                                
+                                seatCounter++;
+                            }
+                        }
+                    }
+                    
+                    // 收集未分配的学生信息
+                    classNames.forEach(className => {
+                        const unassignedCount = classSizes[className] - classCounters[className];
+                        if (unassignedCount > 0) {
+                            for (let i = classCounters[className]; i < classSizes[className]; i++) {
+                                unassignedStudents.push({
+                                    name: classData[className][i],
+                                    class: className
+                                });
+                            }
+                        }
+                    });
+                    
+                    // 准备班级统计信息
+                    classStats = {};
+                    classNames.forEach(className => {
+                        classStats[className] = {
+                            total: classSizes[className],
+                            assigned: classCounters[className],
+                            unassigned: classSizes[className] - classCounters[className]
+                        };
+                    });
+                    
+                    // 如果有未分配的学生，显示处理对话框
+                    if (unassignedStudents.length > 0) {
+                        loadingElement.style.display = 'none';
+                        showUnassignedModal();
+                    } else {
+                        // 没有未分配学生，直接显示结果
+                        displayResults();
+                        generateExcelFiles();
+                        
+                        let unassignedInfo = '所有学生都已成功分配座位';
+                        showStatusMessage(unassignedInfo, 'success');
+                        loadingElement.style.display = 'none';
+                    }
+                    
+                } catch (error) {
+                    console.error('处理文件时出错:', error);
+                    showStatusMessage('处理文件时出错: ' + error.message, 'error');
+                    loadingElement.style.display = 'none';
+                }
+            };
+            
+            reader.readAsArrayBuffer(file);
+        }
+
+        // 显示未分配学生处理模态框
+        function showUnassignedModal() {
+            const modal = document.getElementById('unassignedModal');
+            const modalBody = document.getElementById('modalBody');
+            const progressInfo = document.getElementById('progressInfo');
+            const finishBtn = document.getElementById('finishBtn');
+            
+            // 重置索引
+            currentUnassignedIndex = 0;
+            
+            // 更新进度信息
+            progressInfo.textContent = `处理进度：0/${unassignedStudents.length}`;
+            
+            // 显示第一个未分配学生
+            if (unassignedStudents.length > 0) {
+                displayCurrentUnassignedStudent();
+                modal.style.display = 'block';
+            }
+        }
+
+        // 显示当前未分配学生
+        function displayCurrentUnassignedStudent() {
+            const modalBody = document.getElementById('modalBody');
+            const progressInfo = document.getElementById('progressInfo');
+            const finishBtn = document.getElementById('finishBtn');
+            
+            // 更新进度信息
+            progressInfo.textContent = `处理进度：${currentUnassignedIndex}/${unassignedStudents.length}`;
+            
+            // 如果所有学生都已处理，显示完成按钮
+            if (currentUnassignedIndex >= unassignedStudents.length) {
+                modalBody.innerHTML = '<p style="text-align: center; color: #28a745; font-size: 18px;">所有未分配学生已处理完成！</p>';
+                finishBtn.style.display = 'block';
+                return;
+            }
+            
+            // 隐藏完成按钮
+            finishBtn.style.display = 'none';
+            
+            const student = unassignedStudents[currentUnassignedIndex];
+            const classroomCount = parseInt(document.getElementById('classroomCount').value);
+            const seatCount = parseInt(document.getElementById('seatCount').value);
+            
+            // 创建学生处理界面
+            const studentItem = document.createElement('div');
+            studentItem.className = 'unassigned-student-item';
+            
+            // 获取已使用的座位
+            const usedSeats = getUsedSeats();
+            
+            studentItem.innerHTML = `
+                <div class="student-info">
+                    <span class="student-name">${student.name}</span>
+                    <span class="student-class">${student.class}</span>
+                </div>
+                <div class="assignment-options">
+                    <select id="classroomSelect">
+                        <option value="">选择考场</option>
+                        ${Array.from({length: classroomCount}, (_, i) => i + 1).map(room => 
+                            `<option value="${room}">考场${room}</option>`
+                        ).join('')}
+                    </select>
+                    <select id="seatSelect" disabled>
+                        <option value="">先选择考场</option>
+                    </select>
+                    <button class="assign-btn" id="assignBtn" disabled>分配座位</button>
+                    <button class="skip-btn" id="skipBtn">跳过此学生</button>
+                </div>
+            `;
+            
+            modalBody.innerHTML = '';
+            modalBody.appendChild(studentItem);
+            
+            // 监听考场选择变化
+            const classroomSelect = document.getElementById('classroomSelect');
+            const seatSelect = document.getElementById('seatSelect');
+            const assignBtn = document.getElementById('assignBtn');
+            const skipBtn = document.getElementById('skipBtn');
+            
+            classroomSelect.addEventListener('change', function() {
+                const classroomNumber = parseInt(this.value);
+                seatSelect.innerHTML = '<option value="">选择座位</option>';
+                assignBtn.disabled = true;
+                
+                if (classroomNumber) {
+                    // 获取该考场已使用的座位
+                    const classroomUsedSeats = usedSeats[classroomNumber] || new Set();
+                    
+                    // 生成可用座位选项
+                    for (let i = 1; i <= seatCount; i++) {
+                        if (!classroomUsedSeats.has(i)) {
+                            seatSelect.innerHTML += `<option value="${i}">座位${i}</option>`;
+                        }
+                    }
+                    
+                    // 如果该考场没有可用座位，添加额外座位选项
+                    if (seatSelect.options.length === 1) {
+                        const nextSeat = seatCount + 1;
+                        if (!additionalSeats[classroomNumber]) {
+                            additionalSeats[classroomNumber] = [];
+                        }
+                        const additionalSeatCount = additionalSeats[classroomNumber].length;
+                        for (let i = 0; i < 5; i++) { // 提供5个额外座位选项
+                            const seatNum = nextSeat + i;
+                            seatSelect.innerHTML += `<option value="${seatNum}">额外座位${seatNum}</option>`;
+                        }
+                    }
+                    
+                    seatSelect.disabled = false;
+                }
+            });
+            
+            seatSelect.addEventListener('change', function() {
+                assignBtn.disabled = !this.value;
+            });
+            
+            assignBtn.addEventListener('click', function() {
+                const classroomNumber = parseInt(classroomSelect.value);
+                const seatNumber = parseInt(seatSelect.value);
+                
+                if (classroomNumber && seatNumber) {
+                    assignUnassignedStudent(student, classroomNumber, seatNumber);
+                }
+            });
+            
+            skipBtn.addEventListener('click', function() {
+                currentUnassignedIndex++;
+                displayCurrentUnassignedStudent();
+            });
+        }
+
+        // 获取已使用的座位
+        function getUsedSeats() {
+            const usedSeats = {};
+            assignments.forEach(assignment => {
+                if (!usedSeats[assignment.classroom]) {
+                    usedSeats[assignment.classroom] = new Set();
+                }
+                usedSeats[assignment.classroom].add(assignment.seat);
+            });
+            
+            // 添加额外座位
+            Object.keys(additionalSeats).forEach(classroomNumber => {
+                if (!usedSeats[classroomNumber]) {
+                    usedSeats[classroomNumber] = new Set();
+                }
+                additionalSeats[classroomNumber].forEach(seatNumber => {
+                    usedSeats[classroomNumber].add(seatNumber);
+                });
+            });
+            
+            return usedSeats;
+        }
+
+        // 分配未分配学生
+        function assignUnassignedStudent(student, classroomNumber, seatNumber) {
+            const examPrefix = document.getElementById('examPrefix').value.trim();
+            
+            // 生成考号
+            const examNumber = `${examPrefix}${classNameToNumber[student.class]}${classroomNumber.toString().padStart(2, '0')}${seatNumber.toString().padStart(2, '0')}`;
+            
+            // 添加到分配列表
+            assignments.push({
+                name: student.name,
+                classroom: classroomNumber,
+                seat: seatNumber,
+                class: student.class,
+                examNumber: examNumber
+            });
+            
+            // 如果是额外座位，记录到额外座位列表
+            const seatCount = parseInt(document.getElementById('seatCount').value);
+            if (seatNumber > seatCount) {
+                if (!additionalSeats[classroomNumber]) {
+                    additionalSeats[classroomNumber] = [];
+                }
+                additionalSeats[classroomNumber].push(seatNumber);
+            }
+            
+            // 更新班级统计
+            classStats[student.class].assigned++;
+            classStats[student.class].unassigned--;
+            
+            // 处理下一个学生
+            currentUnassignedIndex++;
+            displayCurrentUnassignedStudent();
+        }
+
+        // 关闭未分配学生处理模态框
+        function closeUnassignedModal() {
+            const modal = document.getElementById('unassignedModal');
+            modal.style.display = 'none';
+        }
+
+        // 完成未分配学生处理
+        function finishUnassignedAssignment() {
+            closeUnassignedModal();
+            
+            // 显示结果
+            displayResults();
+            
+            // 生成Excel文件
+            generateExcelFiles();
+            
+            // 显示完成消息
+            const assignedCount = unassignedStudents.length - unassignedStudents.filter((s, i) => i >= currentUnassignedIndex).length;
+            const skippedCount = unassignedStudents.filter((s, i) => i >= currentUnassignedIndex).length;
+            
+            let message = `未分配学生处理完成！<br>`;
+            message += `已分配：${assignedCount}人<br>`;
+            if (skippedCount > 0) {
+                message += `跳过：${skippedCount}人`;
+            }
+            
+            showStatusMessage(message, 'success');
+        }
+
+        // 显示结果表格
+        function displayResults() {
+            const resultContainer = document.getElementById('resultContainer');
+            const resultTableBody = document.getElementById('resultTableBody');
+            
+            // 清空之前的结果
+            resultTableBody.innerHTML = '';
+            
+            // 添加结果行
+            assignments.forEach(assignment => {
+                const row = document.createElement('tr');
+                row.innerHTML = `
+                    <td>${assignment.name}</td>
+                    <td>${assignment.classroom}</td>
+                    <td>${assignment.seat}</td>
+                    <td>${assignment.class}</td>
+                    <td>${assignment.examNumber}</td>
+                `;
+                resultTableBody.appendChild(row);
+            });
+            
+            // 显示未分配学生列表
+            const unassignedContainer = document.getElementById('unassignedContainer');
+            const unassignedList = document.getElementById('unassignedList');
+            
+            const remainingUnassigned = unassignedStudents.filter((s, i) => i >= currentUnassignedIndex);
+            
+            if (remainingUnassigned.length > 0) {
+                unassignedContainer.style.display = 'block';
+                unassignedList.innerHTML = '';
+                
+                remainingUnassigned.forEach(student => {
+                    const item = document.createElement('div');
+                    item.textContent = `${student.class} - ${student.name}`;
+                    unassignedList.appendChild(item);
+                });
+            } else {
+                unassignedContainer.style.display = 'none';
+            }
+            
+            resultContainer.style.display = 'block';
+        }
+
+        // 更新统计信息
+        function updateStatistics() {
+            // 更新统计卡片
+            document.getElementById('totalClasses').textContent = classNames.length;
+            
+            const totalStudents = Object.values(classStats).reduce((sum, stat) => sum + stat.total, 0);
+            document.getElementById('totalStudents').textContent = totalStudents;
+            
+            const assignedSeats = Object.values(classStats).reduce((sum, stat) => sum + stat.assigned, 0);
+            document.getElementById('assignedSeats').textContent = assignedSeats;
+            
+            const unassignedSeats = Object.values(classStats).reduce((sum, stat) => sum + stat.unassigned, 0);
+            document.getElementById('unassignedSeats').textContent = unassignedSeats;
+            
+            // 更新统计表格
+            const statsTableBody = document.getElementById('statsTableBody');
+            statsTableBody.innerHTML = '';
+            
+            // 按班级名称排序
+            const sortedClassNames = [...classNames].sort();
+            
+            sortedClassNames.forEach(className => {
+                const stat = classStats[className];
+                const row = document.createElement('tr');
+                
+                // 计算分配率
+                const assignmentRate = stat.total > 0 ? (stat.assigned / stat.total * 100).toFixed(1) : 0;
+                
+                row.innerHTML = `
+                    <td>${className}</td>
+                    <td>${stat.total}</td>
+                    <td>${stat.assigned}</td>
+                    <td>${stat.unassigned}</td>
+                    <td>${assignmentRate}%</td>
+                `;
+                statsTableBody.appendChild(row);
+            });
+            
+            // 更新图表
+            updateChart();
+        }
+
+        // 更新图表
+        function updateChart() {
+            const ctx = document.getElementById('classChart').getContext('2d');
+            
+            // 准备图表数据
+            const sortedClassNames = [...classNames].sort();
+            const totalData = sortedClassNames.map(className => classStats[className].total);
+            const assignedData = sortedClassNames.map(className => classStats[className].assigned);
+            const unassignedData = sortedClassNames.map(className => classStats[className].unassigned);
+            
+            // 如果已有图表，先销毁
+            if (window.classChart) {
+                window.classChart.destroy();
+            }
+            
+            // 创建新图表
+            window.classChart = new Chart(ctx, {
+                type: 'bar',
+                data: {
+                    labels: sortedClassNames,
+                    datasets: [
+                        {
+                            label: '已分配',
+                            data: assignedData,
+                            backgroundColor: 'rgba(75, 192, 192, 0.6)',
+                            borderColor: 'rgba(75, 192, 192, 1)',
+                            borderWidth: 1
+                        },
+                        {
+                            label: '未分配',
+                            data: unassignedData,
+                            backgroundColor: 'rgba(255, 99, 132, 0.6)',
+                            borderColor: 'rgba(255, 99, 132, 1)',
+                            borderWidth: 1
+                        }
+                    ]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    scales: {
+                        x: {
+                            stacked: true,
+                            title: {
+                                display: true,
+                                text: '班级'
+                            }
+                        },
+                        y: {
+                            stacked: true,
+                            title: {
+                                display: true,
+                                text: '学生人数'
+                            },
+                            beginAtZero: true
+                        }
+                    },
+                    plugins: {
+                        title: {
+                            display: true,
+                            text: '各班级座位分配情况'
+                        },
+                        tooltip: {
+                            callbacks: {
+                                footer: function(tooltipItems) {
+                                    const index = tooltipItems[0].dataIndex;
+                                    const total = totalData[index];
+                                    const assigned = assignedData[index];
+                                    const rate = total > 0 ? (assigned / total * 100).toFixed(1) : 0;
+                                    return `分配率: ${rate}%`;
+                                }
+                            }
+                        }
+                    }
+                }
+            });
+        }
+
+        // 生成座位表打印Excel文件
+        function generateSeatPrintExcel() {
+            // 创建新的工作簿
+            const seatPrintWorkbook = XLSX.utils.book_new();
+            
+            // 创建工作表数据
+            const seatPrintData = [];
+            
+            // 添加表头
+            seatPrintData.push(['考号', '姓名', '', '']);
+            
+            // 计算分割点
+            const halfCount = Math.ceil(assignments.length / 2);
+            
+            // 添加前一半学生到A列和B列
+            for (let i = 0; i < halfCount; i++) {
+                if (i < assignments.length) {
+                    seatPrintData.push([
+                        assignments[i].examNumber,
+                        assignments[i].name,
+                        '',
+                        ''
+                    ]);
+                }
+            }
+            
+            // 添加后一半学生到C列和D列
+            for (let i = halfCount; i < assignments.length; i++) {
+                const rowIndex = i - halfCount + 1; // 从第二行开始
+                if (rowIndex < seatPrintData.length) {
+                    seatPrintData[rowIndex][2] = assignments[i].examNumber;
+                    seatPrintData[rowIndex][3] = assignments[i].name;
+                } else {
+                    // 如果需要更多行，添加新行
+                    seatPrintData.push([
+                        '',
+                        '',
+                        assignments[i].examNumber,
+                        assignments[i].name
+                    ]);
+                }
+            }
+            
+            // 如果有未分配的学生，在最后添加
+            const remainingUnassigned = unassignedStudents.filter((s, i) => i >= currentUnassignedIndex);
+            if (remainingUnassigned.length > 0) {
+                // 添加一个空行
+                seatPrintData.push(['', '', '', '']);
+                
+                // 添加未分配学生信息
+                seatPrintData.push(['未分配学生', '', '', '']);
+                remainingUnassigned.forEach(student => {
+                    seatPrintData.push([`${student.class} - ${student.name}`, '', '', '']);
+                });
+            }
+            
+            // 创建工作表
+            const seatPrintWorksheet = XLSX.utils.aoa_to_sheet(seatPrintData);
+            
+            // 设置列宽
+            seatPrintWorksheet['!cols'] = [
+                { wch: 19.90 }, // A列宽度
+                { wch: 17.90 }, // B列宽度
+                { wch: 19.90 }, // C列宽度
+                { wch: 17.90 }  // D列宽度
+            ];
+            
+            // 设置行高
+            const range = XLSX.utils.decode_range(seatPrintWorksheet['!ref']);
+            const rowCount = range.e.r + 1;
+            seatPrintWorksheet['!rows'] = [];
+            
+            // 第一行高度
+            seatPrintWorksheet['!rows'][0] = { hpt: 15.60 };
+            
+            // 其他行高度
+            for (let i = 1; i < rowCount; i++) {
+                seatPrintWorksheet['!rows'][i] = { hpt: 75.00 };
+            }
+            
+            // 设置字体样式（宋体20号加粗）
+            // 使用更兼容的方式设置字体
+            for (let row = 1; row < rowCount; row++) {
+                // A列考号
+                const cellA = XLSX.utils.encode_cell({ r: row, c: 0 });
+                if (seatPrintWorksheet[cellA] && seatPrintWorksheet[cellA].v) {
+                    if (!seatPrintWorksheet[cellA].s) seatPrintWorksheet[cellA].s = {};
+                    seatPrintWorksheet[cellA].s.font = {
+                        name: '宋体',
+                        sz: 20,
+                        bold: true,
+                        charset: 134
+                    };
+                    seatPrintWorksheet[cellA].s.alignment = {
+                        vertical: 'center',
+                        horizontal: 'center'
+                    };
+                }
+                
+                // B列姓名
+                const cellB = XLSX.utils.encode_cell({ r: row, c: 1 });
+                if (seatPrintWorksheet[cellB] && seatPrintWorksheet[cellB].v) {
+                    if (!seatPrintWorksheet[cellB].s) seatPrintWorksheet[cellB].s = {};
+                    seatPrintWorksheet[cellB].s.font = {
+                        name: '宋体',
+                        sz: 20,
+                        bold: true,
+                        charset: 134
+                    };
+                    seatPrintWorksheet[cellB].s.alignment = {
+                        vertical: 'center',
+                        horizontal: 'center'
+                    };
+                }
+                
+                // C列考号
+                const cellC = XLSX.utils.encode_cell({ r: row, c: 2 });
+                if (seatPrintWorksheet[cellC] && seatPrintWorksheet[cellC].v) {
+                    if (!seatPrintWorksheet[cellC].s) seatPrintWorksheet[cellC].s = {};
+                    seatPrintWorksheet[cellC].s.font = {
+                        name: '宋体',
+                        sz: 20,
+                        bold: true,
+                        charset: 134
+                    };
+                    seatPrintWorksheet[cellC].s.alignment = {
+                        vertical: 'center',
+                        horizontal: 'center'
+                    };
+                }
+                
+                // D列姓名
+                const cellD = XLSX.utils.encode_cell({ r: row, c: 3 });
+                if (seatPrintWorksheet[cellD] && seatPrintWorksheet[cellD].v) {
+                    if (!seatPrintWorksheet[cellD].s) seatPrintWorksheet[cellD].s = {};
+                    seatPrintWorksheet[cellD].s.font = {
+                        name: '宋体',
+                        sz: 20,
+                        bold: true,
+                        charset: 134
+                    };
+                    seatPrintWorksheet[cellD].s.alignment = {
+                        vertical: 'center',
+                        horizontal: 'center'
+                    };
+                }
+            }
+            
+            // 添加工作表到工作簿
+            XLSX.utils.book_append_sheet(seatPrintWorkbook, seatPrintWorksheet, '座位表打印');
+            
+            return seatPrintWorkbook;
+        }
+
+        // 为工作表应用框线和列宽样式
+        function applyWorksheetStyle(worksheet, colWidths) {
+            if (!worksheet['!ref']) return;
+
+            const range = XLSX.utils.decode_range(worksheet['!ref']);
+
+            // 设置列宽
+            if (colWidths && colWidths.length > 0) {
+                worksheet['!cols'] = colWidths.map(w => ({ wch: w }));
+            }
+
+            // 定义通用框线样式
+            const borderStyle = {
+                top:    { style: 'thin', color: { rgb: '000000' } },
+                bottom: { style: 'thin', color: { rgb: '000000' } },
+                left:   { style: 'thin', color: { rgb: '000000' } },
+                right:  { style: 'thin', color: { rgb: '000000' } }
+            };
+
+            // 遍历所有单元格，添加框线
+            for (let R = range.s.r; R <= range.e.r; R++) {
+                for (let C = range.s.c; C <= range.e.c; C++) {
+                    const cellAddress = XLSX.utils.encode_cell({ r: R, c: C });
+                    const cell = worksheet[cellAddress];
+                    if (cell) {
+                        if (!cell.s) cell.s = {};
+                        cell.s.border = borderStyle;
+
+                        // 表头行（第一行）加粗居中
+                        if (R === 0) {
+                            cell.s.font = { bold: true, sz: 11 };
+                            cell.s.alignment = {
+                                vertical: 'center',
+                                horizontal: 'center'
+                            };
+                            cell.s.fill = {
+                                fgColor: { rgb: 'E0E0E0' }
+                            };
+                        } else {
+                            // 数据行居中
+                            cell.s.alignment = {
+                                vertical: 'center',
+                                horizontal: 'center'
+                            };
+                        }
+                    }
+                }
+            }
+        }
+
+        // 生成Excel文件并提供下载
+        function generateExcelFiles() {
+            const downloadContainer = document.getElementById('downloadContainer');
+            downloadContainer.innerHTML = '';
+            
+            // 创建总表工作簿
+            const totalWorkbook = XLSX.utils.book_new();
+            const totalData = assignments.map(a => ({
+                '姓名': a.name,
+                '考场号': a.classroom,
+                '座位号': a.seat,
+                '班级': a.class,
+                '考号': a.examNumber
+            }));
+            const totalWorksheet = XLSX.utils.json_to_sheet(totalData);
+            applyWorksheetStyle(totalWorksheet, [12, 10, 10, 18, 22]);
+            XLSX.utils.book_append_sheet(totalWorkbook, totalWorksheet, '总表');
+            
+            // 添加总表下载按钮
+            const totalDownloadBtn = document.createElement('a');
+            totalDownloadBtn.className = 'download-btn';
+            totalDownloadBtn.textContent = '下载总表';
+            totalDownloadBtn.href = '#';
+            totalDownloadBtn.onclick = function() {
+                XLSX.writeFile(totalWorkbook, '总表.xlsx');
+                return false;
+            };
+            downloadContainer.appendChild(totalDownloadBtn);
+            
+            // 为每个班级生成单独的表格
+            classNames.forEach(className => {
+                const classData = assignments
+                    .filter(a => a.class === className)
+                    .map(a => ({
+                        '姓名': a.name,
+                        '考场号': a.classroom,
+                        '座位号': a.seat,
+                        '班级': a.class,
+                        '考号': a.examNumber
+                    }));
+                
+                if (classData.length > 0) {
+                    const classWorksheet = XLSX.utils.json_to_sheet(classData);
+                    applyWorksheetStyle(classWorksheet, [12, 10, 10, 18, 22]);
+                    XLSX.utils.book_append_sheet(totalWorkbook, classWorksheet, className);
+                    
+                    // 添加班级表下载按钮
+                    const classDownloadBtn = document.createElement('a');
+                    classDownloadBtn.className = 'download-btn';
+                    classDownloadBtn.textContent = `下载${className}分配表`;
+                    classDownloadBtn.href = '#';
+                    classDownloadBtn.onclick = function() {
+                        const classWorkbook = XLSX.utils.book_new();
+                        XLSX.utils.book_append_sheet(classWorkbook, classWorksheet, className);
+                        XLSX.writeFile(classWorkbook, `${className}_分配表.xlsx`);
+                        return false;
+                    };
+                    downloadContainer.appendChild(classDownloadBtn);
+                }
+            });
+            
+            // 为每个考场生成单独的表格
+            const classroomCountValue = parseInt(document.getElementById('classroomCount').value);
+            for (let i = 1; i <= classroomCountValue; i++) {
+                const classroomData = assignments
+                    .filter(a => a.classroom === i)
+                    .map(a => ({
+                        '姓名': a.name,
+                        '座位号': a.seat,
+                        '班级': a.class,
+                        '考号': a.examNumber
+                    }));
+                
+                if (classroomData.length > 0) {
+                    const classroomWorksheet = XLSX.utils.json_to_sheet(classroomData);
+                    applyWorksheetStyle(classroomWorksheet, [12, 10, 18, 22]);
+                    XLSX.utils.book_append_sheet(totalWorkbook, classroomWorksheet, `考场${i}`);
+                    
+                    // 添加考场表下载按钮
+                    const classroomDownloadBtn = document.createElement('a');
+                    classroomDownloadBtn.className = 'download-btn';
+                    classroomDownloadBtn.textContent = `下载考场${i}分配表`;
+                    classroomDownloadBtn.href = '#';
+                    classroomDownloadBtn.onclick = function() {
+                        const classroomWorkbook = XLSX.utils.book_new();
+                        XLSX.utils.book_append_sheet(classroomWorkbook, classroomWorksheet, `考场${i}`);
+                        XLSX.writeFile(classroomWorkbook, `考场${i}_分配表.xlsx`);
+                        return false;
+                    };
+                    downloadContainer.appendChild(classroomDownloadBtn);
+                }
+            }
+            
+            // 添加简化的统计表到总表工作簿（只包含班级和参考人数）
+            const statsData = [];
+            const sortedClassNames = [...classNames].sort();
+            sortedClassNames.forEach(className => {
+                const stat = classStats[className];
+                statsData.push({
+                    '班级': className,
+                    '参考人数': stat.assigned
+                });
+            });
+            const statsWorksheet = XLSX.utils.json_to_sheet(statsData);
+            applyWorksheetStyle(statsWorksheet, [18, 12]);
+            XLSX.utils.book_append_sheet(totalWorkbook, statsWorksheet, '班级统计');
+            
+            // 生成座位表打印Excel文件
+            const seatPrintWorkbook = generateSeatPrintExcel();
+            
+            // 添加座位表打印下载按钮
+            const seatPrintDownloadBtn = document.createElement('a');
+            seatPrintDownloadBtn.className = 'download-btn';
+            seatPrintDownloadBtn.textContent = '下载座位表打印';
+            seatPrintDownloadBtn.href = '#';
+            seatPrintDownloadBtn.onclick = function() {
+                XLSX.writeFile(seatPrintWorkbook, '座位表打印.xlsx');
+                return false;
+            };
+            downloadContainer.appendChild(seatPrintDownloadBtn);
+            
+            // 添加下载所有工作表的按钮
+            document.getElementById('downloadAllBtn').onclick = function() {
+                XLSX.writeFile(totalWorkbook, '完整分配表.xlsx');
+            };
+        }
+
+        // 初始化页面
+        document.addEventListener('DOMContentLoaded', function() {
+            // 初始化座位号显示
+            initializeSeatOrder();
+            
+            // 监听座位数变化
+            document.getElementById('seatCount').addEventListener('change', initializeSeatOrder);
+            
+            // 监听生成按钮点击
+            document.getElementById('generateBtn').addEventListener('click', generateAssignment);
+        });
+    </script>
+</body>
+</html>
