@@ -5,6 +5,8 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>考场座位分配系统</title>
     <script src="https://cdn.jsdelivr.net/npm/xlsx-js-style@1.2.0/dist/xlsx.bundle.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/jspdf@2.5.1/dist/jspdf.umd.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/html2canvas@1.4.1/dist/html2canvas.min.js"></script>
     <style>
         * {
             box-sizing: border-box;
@@ -533,6 +535,11 @@
                 <h3>高级下载选项：</h3>
                 <div class="form-group">
                     <button id="downloadAllBtn">下载完整分配表（包含所有工作表）</button>
+                </div>
+                
+                <h3>打印下载选项：</h3>
+                <div class="form-group">
+                    <button id="downloadPdfBtn" style="background-color: #e74c3c;">下载考场座位表PDF（用于打印）</button>
                 </div>
                 
                 <div class="unassigned-container" id="unassignedContainer" style="display: none;">
@@ -1615,6 +1622,165 @@
             return seatPrintWorkbook;
         }
 
+        // 生成考场座位表PDF（每页一个考场，适合打印）
+        function generatePDF() {
+            const { jsPDF } = window.jspdf;
+            const classroomCount = parseInt(document.getElementById('classroomCount').value);
+            const seatCount = parseInt(document.getElementById('seatCount').value);
+            
+            // 收集有效考场
+            const validRooms = [];
+            for (let i = 1; i <= classroomCount; i++) {
+                const roomAssignments = assignments.filter(a => a.classroom === i);
+                if (roomAssignments.length > 0) {
+                    validRooms.push({ roomNum: i, assignments: roomAssignments });
+                }
+            }
+            
+            if (validRooms.length === 0) {
+                showStatusMessage('没有可用的考场数据来生成PDF', 'error');
+                return;
+            }
+            
+            // 创建隐藏的渲染容器
+            const renderContainer = document.createElement('div');
+            renderContainer.id = 'pdf-render-container';
+            renderContainer.style.cssText = 'position:fixed; left:-9999px; top:0; z-index:-1;';
+            document.body.appendChild(renderContainer);
+            
+            // 为每个考场创建HTML内容
+            validRooms.forEach((room, index) => {
+                const pageDiv = document.createElement('div');
+                pageDiv.className = 'pdf-page';
+                pageDiv.style.cssText = `
+                    width: 210mm;
+                    min-height: 297mm;
+                    padding: 15mm 12mm;
+                    background: white;
+                    font-family: 'Microsoft YaHei', 'SimHei', sans-serif;
+                    position: relative;
+                    box-sizing: border-box;
+                    page-break-after: always;
+                `;
+                
+                // 考场标题（简洁版）
+                const titleDiv = document.createElement('div');
+                titleDiv.style.cssText = `
+                    text-align: center;
+                    margin-bottom: 6mm;
+                    padding-bottom: 4mm;
+                    border-bottom: 1px solid #999;
+                `;
+                titleDiv.innerHTML = `
+                    <div style="font-size: 22px; font-weight: bold; color: #333;">第${room.roomNum}考场</div>
+                `;
+                pageDiv.appendChild(titleDiv);
+                
+                // 表格
+                const table = document.createElement('table');
+                table.style.cssText = `
+                    width: 100%;
+                    border-collapse: collapse;
+                    font-size: 13px;
+                `;
+                
+                // 表头
+                const thead = document.createElement('thead');
+                thead.innerHTML = `
+                    <tr>
+                        <th style="border: 1px solid #bbb; padding: 8px 6px; background-color: #f2f2f2; color: #333; font-size: 13px; width: 40px;">序号</th>
+                        <th style="border: 1px solid #bbb; padding: 8px 6px; background-color: #f2f2f2; color: #333; font-size: 13px; width: 50px;">座位号</th>
+                        <th style="border: 1px solid #bbb; padding: 8px 6px; background-color: #f2f2f2; color: #333; font-size: 13px;">考号</th>
+                        <th style="border: 1px solid #bbb; padding: 8px 6px; background-color: #f2f2f2; color: #333; font-size: 13px; width: 70px;">姓名</th>
+                        <th style="border: 1px solid #bbb; padding: 8px 6px; background-color: #f2f2f2; color: #333; font-size: 13px;">班级</th>
+                    </tr>
+                `;
+                table.appendChild(thead);
+                
+                // 表体
+                const tbody = document.createElement('tbody');
+                room.assignments.forEach((a, idx) => {
+                    const tr = document.createElement('tr');
+                    const bgColor = idx % 2 === 0 ? '#ffffff' : '#f0f7ff';
+                    tr.innerHTML = `
+                        <td style="border: 1px solid #ddd; padding: 6px; text-align: center; background-color: ${bgColor};">${idx + 1}</td>
+                        <td style="border: 1px solid #ddd; padding: 6px; text-align: center; background-color: ${bgColor};">${a.seat}</td>
+                        <td style="border: 1px solid #ddd; padding: 6px; text-align: center; background-color: ${bgColor}; font-family: 'Courier New', monospace; letter-spacing: 1px;">${a.examNumber}</td>
+                        <td style="border: 1px solid #ddd; padding: 6px; text-align: center; background-color: ${bgColor}; font-weight: bold;">${a.name}</td>
+                        <td style="border: 1px solid #ddd; padding: 6px; text-align: center; background-color: ${bgColor};">${a.class}</td>
+                    `;
+                    tbody.appendChild(tr);
+                });
+                table.appendChild(tbody);
+                pageDiv.appendChild(table);
+                
+                // 页脚（已移除，只保留必要信息）
+                
+                renderContainer.appendChild(pageDiv);
+            });
+            
+            // 显示加载提示
+            showStatusMessage('正在生成PDF，请稍候...', 'info');
+            
+            // 使用html2canvas逐页渲染并生成PDF
+            const pages = renderContainer.querySelectorAll('.pdf-page');
+            const pdf = new jsPDF('p', 'mm', 'a4');
+            const pdfWidth = 210;
+            const pdfHeight = 297;
+            
+            let currentPage = 0;
+            
+            function renderNextPage() {
+                if (currentPage >= pages.length) {
+                    // 完成：保存PDF并清理
+                    pdf.save('考场座位分配表.pdf');
+                    document.body.removeChild(renderContainer);
+                    showStatusMessage('PDF文件已生成并开始下载！每页包含一个考场的座位分配信息', 'success');
+                    return;
+                }
+                
+                const page = pages[currentPage];
+                
+                html2canvas(page, {
+                    scale: 2,
+                    useCORS: true,
+                    backgroundColor: '#ffffff',
+                    width: page.offsetWidth,
+                    height: page.offsetHeight,
+                    logging: false
+                }).then(canvas => {
+                    if (currentPage > 0) {
+                        pdf.addPage();
+                    }
+                    
+                    const imgData = canvas.toDataURL('image/jpeg', 0.95);
+                    
+                    // 计算图片在PDF中的尺寸（保持宽高比）
+                    const imgWidth = pdfWidth;
+                    const imgHeight = (canvas.height * imgWidth) / canvas.width;
+                    
+                    // 如果内容超过一页，需要缩放
+                    if (imgHeight > pdfHeight) {
+                        const scale = pdfHeight / imgHeight;
+                        const scaledWidth = imgWidth * scale;
+                        const xOffset = (pdfWidth - scaledWidth) / 2;
+                        pdf.addImage(imgData, 'JPEG', xOffset, 0, scaledWidth, pdfHeight);
+                    } else {
+                        pdf.addImage(imgData, 'JPEG', 0, 0, imgWidth, imgHeight);
+                    }
+                    
+                    currentPage++;
+                    renderNextPage();
+                }).catch(err => {
+                    console.error('渲染页面时出错:', err);
+                    document.body.removeChild(renderContainer);
+                    showStatusMessage('生成PDF时出错: ' + err.message, 'error');
+                });
+            }
+            
+            renderNextPage();
+        }
+
         // 为工作表应用框线和列宽样式
         function applyWorksheetStyle(worksheet, colWidths) {
             if (!worksheet['!ref']) return;
@@ -1726,32 +1892,95 @@
                 }
             });
             
-            // 为每个考场生成单独的表格
+            // 为每个考场生成单独的表格（带考场标题行）
             const classroomCountValue = parseInt(document.getElementById('classroomCount').value);
             for (let i = 1; i <= classroomCountValue; i++) {
-                const classroomData = assignments
-                    .filter(a => a.classroom === i)
-                    .map(a => ({
-                        '姓名': a.name,
-                        '座位号': a.seat,
-                        '班级': a.class,
-                        '考号': a.examNumber
-                    }));
+                const classroomAssignments = assignments.filter(a => a.classroom === i);
                 
-                if (classroomData.length > 0) {
-                    const classroomWorksheet = XLSX.utils.json_to_sheet(classroomData);
-                    applyWorksheetStyle(classroomWorksheet, [12, 10, 18, 22]);
-                    XLSX.utils.book_append_sheet(totalWorkbook, classroomWorksheet, `考场${i}`);
+                if (classroomAssignments.length > 0) {
+                    // 使用aoa_to_sheet以支持合并标题行
+                    const classroomAoa = [];
+                    // 标题行
+                    classroomAoa.push([`第${i}考场`, '', '', '']);
+                    // 表头行
+                    classroomAoa.push(['姓名', '座位号', '班级', '考号']);
+                    // 数据行
+                    classroomAssignments.forEach(a => {
+                        classroomAoa.push([a.name, a.seat, a.class, a.examNumber]);
+                    });
+                    
+                    const classroomWorksheet = XLSX.utils.aoa_to_sheet(classroomAoa);
+                    
+                    // 合并标题行的单元格
+                    classroomWorksheet['!merges'] = [
+                        { s: { r: 0, c: 0 }, e: { r: 0, c: 3 } }
+                    ];
+                    
+                    // 设置列宽
+                    classroomWorksheet['!cols'] = [{ wch: 12 }, { wch: 10 }, { wch: 18 }, { wch: 22 }];
+                    
+                    // 设置行高
+                    const classroomRowCount = classroomAoa.length;
+                    classroomWorksheet['!rows'] = [];
+                    classroomWorksheet['!rows'][0] = { hpt: 30 }; // 标题行高度
+                    
+                    // 样式：标题行加粗大字体居中（无背景色）
+                    const titleCell = XLSX.utils.encode_cell({ r: 0, c: 0 });
+                    if (classroomWorksheet[titleCell]) {
+                        classroomWorksheet[titleCell].s = {
+                            font: { name: '宋体', sz: 16, bold: true, charset: 134 },
+                            alignment: { vertical: 'center', horizontal: 'center' }
+                        };
+                    }
+                    
+                    // 样式：表头行
+                    const headerCols = [0, 1, 2, 3];
+                    headerCols.forEach(c => {
+                        const cell = XLSX.utils.encode_cell({ r: 1, c: c });
+                        if (classroomWorksheet[cell]) {
+                            classroomWorksheet[cell].s = {
+                                font: { bold: true, sz: 11 },
+                                alignment: { vertical: 'center', horizontal: 'center' },
+                                fill: { fgColor: { rgb: 'E0E0E0' } },
+                                border: {
+                                    top: { style: 'thin', color: { rgb: '000000' } },
+                                    bottom: { style: 'thin', color: { rgb: '000000' } },
+                                    left: { style: 'thin', color: { rgb: '000000' } },
+                                    right: { style: 'thin', color: { rgb: '000000' } }
+                                }
+                            };
+                        }
+                    });
+                    
+                    // 样式：数据行
+                    for (let r = 2; r < classroomRowCount; r++) {
+                        for (let c = 0; c < 4; c++) {
+                            const cell = XLSX.utils.encode_cell({ r: r, c: c });
+                            if (classroomWorksheet[cell]) {
+                                classroomWorksheet[cell].s = {
+                                    alignment: { vertical: 'center', horizontal: 'center' },
+                                    border: {
+                                        top: { style: 'thin', color: { rgb: '000000' } },
+                                        bottom: { style: 'thin', color: { rgb: '000000' } },
+                                        left: { style: 'thin', color: { rgb: '000000' } },
+                                        right: { style: 'thin', color: { rgb: '000000' } }
+                                    }
+                                };
+                            }
+                        }
+                    }
+                    
+                    XLSX.utils.book_append_sheet(totalWorkbook, classroomWorksheet, `第${i}考场`);
                     
                     // 添加考场表下载按钮
                     const classroomDownloadBtn = document.createElement('a');
                     classroomDownloadBtn.className = 'download-btn';
-                    classroomDownloadBtn.textContent = `下载考场${i}分配表`;
+                    classroomDownloadBtn.textContent = `下载第${i}考场分配表`;
                     classroomDownloadBtn.href = '#';
                     classroomDownloadBtn.onclick = function() {
                         const classroomWorkbook = XLSX.utils.book_new();
-                        XLSX.utils.book_append_sheet(classroomWorkbook, classroomWorksheet, `考场${i}`);
-                        XLSX.writeFile(classroomWorkbook, `考场${i}_分配表.xlsx`);
+                        XLSX.utils.book_append_sheet(classroomWorkbook, classroomWorksheet, `第${i}考场`);
+                        XLSX.writeFile(classroomWorkbook, `第${i}考场_分配表.xlsx`);
                         return false;
                     };
                     downloadContainer.appendChild(classroomDownloadBtn);
@@ -1774,6 +2003,11 @@
             
             // 生成座位表打印Excel文件
             const seatPrintWorkbook = generateSeatPrintExcel();
+            
+            // 生成PDF
+            document.getElementById('downloadPdfBtn').onclick = function() {
+                generatePDF();
+            };
             
             // 添加座位表打印下载按钮
             const seatPrintDownloadBtn = document.createElement('a');
