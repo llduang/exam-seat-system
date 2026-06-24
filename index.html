@@ -1656,6 +1656,7 @@
                     width: 210mm;
                     min-height: 297mm;
                     padding: 15mm 12mm;
+                    background: white;
                     font-family: 'Microsoft YaHei', 'SimHei', sans-serif;
                     position: relative;
                     box-sizing: border-box;
@@ -1702,11 +1703,11 @@
                 room.assignments.forEach((a, idx) => {
                     const tr = document.createElement('tr');
                     tr.innerHTML = `
-                        <td style="border: 1px solid #000; padding: 6px; text-align: center;">${idx + 1}</td>
-                        <td style="border: 1px solid #000; padding: 6px; text-align: center;">${a.seat}</td>
-                        <td style="border: 1px solid #000; padding: 6px; text-align: center; font-family: 'Courier New', monospace; letter-spacing: 1px;">${a.examNumber}</td>
+                        <td style="border: 1px solid #000; padding: 6px; text-align: center; font-weight: bold;">${idx + 1}</td>
+                        <td style="border: 1px solid #000; padding: 6px; text-align: center; font-weight: bold;">${a.seat}</td>
+                        <td style="border: 1px solid #000; padding: 6px; text-align: center; font-family: 'Courier New', monospace; letter-spacing: 1px; font-weight: bold;">${a.examNumber}</td>
                         <td style="border: 1px solid #000; padding: 6px; text-align: center; font-weight: bold;">${a.name}</td>
-                        <td style="border: 1px solid #000; padding: 6px; text-align: center;">${a.class}</td>
+                        <td style="border: 1px solid #000; padding: 6px; text-align: center; font-weight: bold;">${a.class}</td>
                     `;
                     tbody.appendChild(tr);
                 });
@@ -1741,9 +1742,9 @@
                 const page = pages[currentPage];
                 
                 html2canvas(page, {
-                    scale: 2,
+                    scale: 1.5,
                     useCORS: true,
-                    backgroundColor: null,
+                    backgroundColor: '#ffffff',
                     width: page.offsetWidth,
                     height: page.offsetHeight,
                     logging: false
@@ -1752,7 +1753,7 @@
                         pdf.addPage();
                     }
                     
-                    const imgData = canvas.toDataURL('image/png');
+                    const imgData = canvas.toDataURL('image/jpeg', 0.85);
                     
                     // 计算图片在PDF中的尺寸（保持宽高比）
                     const imgWidth = pdfWidth;
@@ -1763,9 +1764,9 @@
                         const scale = pdfHeight / imgHeight;
                         const scaledWidth = imgWidth * scale;
                         const xOffset = (pdfWidth - scaledWidth) / 2;
-                        pdf.addImage(imgData, 'PNG', xOffset, 0, scaledWidth, pdfHeight);
+                        pdf.addImage(imgData, 'JPEG', xOffset, 0, scaledWidth, pdfHeight);
                     } else {
-                        pdf.addImage(imgData, 'PNG', 0, 0, imgWidth, imgHeight);
+                        pdf.addImage(imgData, 'JPEG', 0, 0, imgWidth, imgHeight);
                     }
                     
                     currentPage++;
