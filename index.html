@@ -1752,7 +1752,7 @@
                         pdf.addPage();
                     }
                     
-                    const imgData = canvas.toDataURL('image/jpeg', 0.95);
+                    const imgData = canvas.toDataURL('image/png');
                     
                     // 计算图片在PDF中的尺寸（保持宽高比）
                     const imgWidth = pdfWidth;
@@ -1763,9 +1763,9 @@
                         const scale = pdfHeight / imgHeight;
                         const scaledWidth = imgWidth * scale;
                         const xOffset = (pdfWidth - scaledWidth) / 2;
-                        pdf.addImage(imgData, 'JPEG', xOffset, 0, scaledWidth, pdfHeight);
+                        pdf.addImage(imgData, 'PNG', xOffset, 0, scaledWidth, pdfHeight);
                     } else {
-                        pdf.addImage(imgData, 'JPEG', 0, 0, imgWidth, imgHeight);
+                        pdf.addImage(imgData, 'PNG', 0, 0, imgWidth, imgHeight);
                     }
                     
                     currentPage++;
