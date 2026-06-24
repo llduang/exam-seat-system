@@ -1656,7 +1656,6 @@
                     width: 210mm;
                     min-height: 297mm;
                     padding: 15mm 12mm;
-                    background: white;
                     font-family: 'Microsoft YaHei', 'SimHei', sans-serif;
                     position: relative;
                     box-sizing: border-box;
@@ -1669,10 +1668,10 @@
                     text-align: center;
                     margin-bottom: 6mm;
                     padding-bottom: 4mm;
-                    border-bottom: 1px solid #999;
+                    border-bottom: 2px solid #000;
                 `;
                 titleDiv.innerHTML = `
-                    <div style="font-size: 22px; font-weight: bold; color: #333;">第${room.roomNum}考场</div>
+                    <div style="font-size: 22px; font-weight: bold; color: #000;">第${room.roomNum}考场</div>
                 `;
                 pageDiv.appendChild(titleDiv);
                 
@@ -1682,17 +1681,18 @@
                     width: 100%;
                     border-collapse: collapse;
                     font-size: 13px;
+                    color: #000;
                 `;
                 
                 // 表头
                 const thead = document.createElement('thead');
                 thead.innerHTML = `
                     <tr>
-                        <th style="border: 1px solid #bbb; padding: 8px 6px; background-color: #f2f2f2; color: #333; font-size: 13px; width: 40px;">序号</th>
-                        <th style="border: 1px solid #bbb; padding: 8px 6px; background-color: #f2f2f2; color: #333; font-size: 13px; width: 50px;">座位号</th>
-                        <th style="border: 1px solid #bbb; padding: 8px 6px; background-color: #f2f2f2; color: #333; font-size: 13px;">考号</th>
-                        <th style="border: 1px solid #bbb; padding: 8px 6px; background-color: #f2f2f2; color: #333; font-size: 13px; width: 70px;">姓名</th>
-                        <th style="border: 1px solid #bbb; padding: 8px 6px; background-color: #f2f2f2; color: #333; font-size: 13px;">班级</th>
+                        <th style="border: 2px solid #000; padding: 8px 6px; color: #000; font-size: 13px; width: 40px; font-weight: bold;">序号</th>
+                        <th style="border: 2px solid #000; padding: 8px 6px; color: #000; font-size: 13px; width: 50px; font-weight: bold;">座位号</th>
+                        <th style="border: 2px solid #000; padding: 8px 6px; color: #000; font-size: 13px; font-weight: bold;">考号</th>
+                        <th style="border: 2px solid #000; padding: 8px 6px; color: #000; font-size: 13px; width: 70px; font-weight: bold;">姓名</th>
+                        <th style="border: 2px solid #000; padding: 8px 6px; color: #000; font-size: 13px; font-weight: bold;">班级</th>
                     </tr>
                 `;
                 table.appendChild(thead);
@@ -1701,13 +1701,12 @@
                 const tbody = document.createElement('tbody');
                 room.assignments.forEach((a, idx) => {
                     const tr = document.createElement('tr');
-                    const bgColor = idx % 2 === 0 ? '#ffffff' : '#f0f7ff';
                     tr.innerHTML = `
-                        <td style="border: 1px solid #ddd; padding: 6px; text-align: center; background-color: ${bgColor};">${idx + 1}</td>
-                        <td style="border: 1px solid #ddd; padding: 6px; text-align: center; background-color: ${bgColor};">${a.seat}</td>
-                        <td style="border: 1px solid #ddd; padding: 6px; text-align: center; background-color: ${bgColor}; font-family: 'Courier New', monospace; letter-spacing: 1px;">${a.examNumber}</td>
-                        <td style="border: 1px solid #ddd; padding: 6px; text-align: center; background-color: ${bgColor}; font-weight: bold;">${a.name}</td>
-                        <td style="border: 1px solid #ddd; padding: 6px; text-align: center; background-color: ${bgColor};">${a.class}</td>
+                        <td style="border: 1px solid #000; padding: 6px; text-align: center;">${idx + 1}</td>
+                        <td style="border: 1px solid #000; padding: 6px; text-align: center;">${a.seat}</td>
+                        <td style="border: 1px solid #000; padding: 6px; text-align: center; font-family: 'Courier New', monospace; letter-spacing: 1px;">${a.examNumber}</td>
+                        <td style="border: 1px solid #000; padding: 6px; text-align: center; font-weight: bold;">${a.name}</td>
+                        <td style="border: 1px solid #000; padding: 6px; text-align: center;">${a.class}</td>
                     `;
                     tbody.appendChild(tr);
                 });
@@ -1744,7 +1743,7 @@
                 html2canvas(page, {
                     scale: 2,
                     useCORS: true,
-                    backgroundColor: '#ffffff',
+                    backgroundColor: null,
                     width: page.offsetWidth,
                     height: page.offsetHeight,
                     logging: false
