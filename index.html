@@ -1469,70 +1469,104 @@
         }
 
         // 生成座位表打印Excel文件
+        // 布局：横向打印；按考场分组；每个考场前一行合并单元格写"第X考场"；
+        //       考场内学生按座位号顺序排列，每行两个学生（考号|姓名|考号|姓名）。
         function generateSeatPrintExcel() {
             // 创建新的工作簿
             const seatPrintWorkbook = XLSX.utils.book_new();
             
             // 创建工作表数据
             const seatPrintData = [];
+            // 合并单元格配置
+            const merges = [];
+            // 记录哪些行是考场标题行（合并行），用于后续样式设置
+            const titleRows = new Set();
             
-            // 添加表头
-            seatPrintData.push(['考号', '姓名', '', '']);
+            let currentRow = 0;
             
-            // 计算分割点
-            const halfCount = Math.ceil(assignments.length / 2);
+            // 取出所有出现过的考场号，并按升序排序
+            const classroomNumbers = Array.from(new Set(assignments.map(a => a.classroom))).sort((a, b) => a - b);
             
-            // 添加前一半学生到A列和B列
-            for (let i = 0; i < halfCount; i++) {
-                if (i < assignments.length) {
+            classroomNumbers.forEach(roomNum => {
+                // 取出该考场的所有学生，按座位号升序排序
+                const roomAssignments = assignments
+                    .filter(a => a.classroom === roomNum)
+                    .sort((a, b) => a.seat - b.seat);
+                
+                if (roomAssignments.length === 0) return;
+                
+                // 考场标题行：合并 A:D，写入"第X考场"
+                titleRows.add(currentRow);
+                seatPrintData.push([`第${roomNum}考场`, '', '', '']);
+                merges.push({
+                    s: { r: currentRow, c: 0 },
+                    e: { r: currentRow, c: 3 }
+                });
+                currentRow++;
+                
+                // 学生数据行：每行两个学生，按顺序排列
+                for (let i = 0; i < roomAssignments.length; i += 2) {
+                    const s1 = roomAssignments[i];
+                    const s2 = roomAssignments[i + 1];
                     seatPrintData.push([
-                        assignments[i].examNumber,
-                        assignments[i].name,
-                        '',
-                        ''
+                        s1 ? s1.examNumber : '',
+                        s1 ? s1.name : '',
+                        s2 ? s2.examNumber : '',
+                        s2 ? s2.name : ''
                     ]);
+                    currentRow++;
                 }
-            }
-            
-            // 添加后一半学生到C列和D列
-            for (let i = halfCount; i < assignments.length; i++) {
-                const rowIndex = i - halfCount + 1; // 从第二行开始
-                if (rowIndex < seatPrintData.length) {
-                    seatPrintData[rowIndex][2] = assignments[i].examNumber;
-                    seatPrintData[rowIndex][3] = assignments[i].name;
-                } else {
-                    // 如果需要更多行，添加新行
-                    seatPrintData.push([
-                        '',
-                        '',
-                        assignments[i].examNumber,
-                        assignments[i].name
-                    ]);
-                }
-            }
+            });
             
             // 如果有未分配的学生，在最后添加
             const remainingUnassigned = unassignedStudents.filter((s, i) => i >= currentUnassignedIndex);
             if (remainingUnassigned.length > 0) {
-                // 添加一个空行
+                // 添加一个空行作为分隔
                 seatPrintData.push(['', '', '', '']);
+                currentRow++;
                 
-                // 添加未分配学生信息
+                // 添加未分配学生标题行（合并 A:D）
+                titleRows.add(currentRow);
                 seatPrintData.push(['未分配学生', '', '', '']);
-                remainingUnassigned.forEach(student => {
-                    seatPrintData.push([`${student.class} - ${student.name}`, '', '', '']);
+                merges.push({
+                    s: { r: currentRow, c: 0 },
+                    e: { r: currentRow, c: 3 }
                 });
+                currentRow++;
+                
+                // 未分配学生信息，同样每行两个
+                for (let i = 0; i < remainingUnassigned.length; i += 2) {
+                    const s1 = remainingUnassigned[i];
+                    const s2 = remainingUnassigned[i + 1];
+                    seatPrintData.push([
+                        s1 ? `${s1.class} - ${s1.name}` : '',
+                        '',
+                        s2 ? `${s2.class} - ${s2.name}` : '',
+                        ''
+                    ]);
+                    currentRow++;
+                }
+            }
+            
+            // 如果没有任何数据，至少放一个空行避免 !ref 为空
+            if (seatPrintData.length === 0) {
+                seatPrintData.push(['', '', '', '']);
             }
             
             // 创建工作表
             const seatPrintWorksheet = XLSX.utils.aoa_to_sheet(seatPrintData);
             
-            // 设置列宽
+            // 应用合并单元格
+            if (merges.length > 0) {
+                seatPrintWorksheet['!merges'] = merges;
+            }
+            
+            // 设置列宽（4列：考号|姓名|考号|姓名）
             seatPrintWorksheet['!cols'] = [
-                { wch: 19.90 }, // A列宽度
-                { wch: 17.90 }, // B列宽度
-                { wch: 19.90 }, // C列宽度
-                { wch: 17.90 }  // D列宽度
+                { wch: 19.90 }, // A列 考号
+                { wch: 17.90 }, // B列 姓名
+                { wch: 19.90 }, // C列 考号
+                { wch: 17.90 }  // D列 姓名
             ];
             
             // 设置行高
@@ -1540,81 +1574,75 @@
             const rowCount = range.e.r + 1;
             seatPrintWorksheet['!rows'] = [];
             
-            // 第一行高度
-            seatPrintWorksheet['!rows'][0] = { hpt: 15.60 };
-            
-            // 其他行高度
-            for (let i = 1; i < rowCount; i++) {
-                seatPrintWorksheet['!rows'][i] = { hpt: 75.00 };
-            }
-            
-            // 设置字体样式（宋体20号加粗）
-            // 使用更兼容的方式设置字体
-            for (let row = 1; row < rowCount; row++) {
-                // A列考号
-                const cellA = XLSX.utils.encode_cell({ r: row, c: 0 });
-                if (seatPrintWorksheet[cellA] && seatPrintWorksheet[cellA].v) {
-                    if (!seatPrintWorksheet[cellA].s) seatPrintWorksheet[cellA].s = {};
-                    seatPrintWorksheet[cellA].s.font = {
-                        name: '宋体',
-                        sz: 20,
-                        bold: true,
-                        charset: 134
-                    };
-                    seatPrintWorksheet[cellA].s.alignment = {
-                        vertical: 'center',
-                        horizontal: 'center'
-                    };
-                }
-                
-                // B列姓名
-                const cellB = XLSX.utils.encode_cell({ r: row, c: 1 });
-                if (seatPrintWorksheet[cellB] && seatPrintWorksheet[cellB].v) {
-                    if (!seatPrintWorksheet[cellB].s) seatPrintWorksheet[cellB].s = {};
-                    seatPrintWorksheet[cellB].s.font = {
-                        name: '宋体',
-                        sz: 20,
-                        bold: true,
-                        charset: 134
-                    };
-                    seatPrintWorksheet[cellB].s.alignment = {
-                        vertical: 'center',
-                        horizontal: 'center'
-                    };
-                }
-                
-                // C列考号
-                const cellC = XLSX.utils.encode_cell({ r: row, c: 2 });
-                if (seatPrintWorksheet[cellC] && seatPrintWorksheet[cellC].v) {
-                    if (!seatPrintWorksheet[cellC].s) seatPrintWorksheet[cellC].s = {};
-                    seatPrintWorksheet[cellC].s.font = {
-                        name: '宋体',
-                        sz: 20,
-                        bold: true,
-                        charset: 134
-                    };
-                    seatPrintWorksheet[cellC].s.alignment = {
-                        vertical: 'center',
-                        horizontal: 'center'
-                    };
-                }
-                
-                // D列姓名
-                const cellD = XLSX.utils.encode_cell({ r: row, c: 3 });
-                if (seatPrintWorksheet[cellD] && seatPrintWorksheet[cellD].v) {
-                    if (!seatPrintWorksheet[cellD].s) seatPrintWorksheet[cellD].s = {};
-                    seatPrintWorksheet[cellD].s.font = {
-                        name: '宋体',
-                        sz: 20,
-                        bold: true,
-                        charset: 134
-                    };
-                    seatPrintWorksheet[cellD].s.alignment = {
-                        vertical: 'center',
-                        horizontal: 'center'
-                    };
+            for (let i = 0; i < rowCount; i++) {
+                if (titleRows.has(i)) {
+                    // 考场标题行高度
+                    seatPrintWorksheet['!rows'][i] = { hpt: 30 };
+                } else {
+                    // 学生数据行高度
+                    seatPrintWorksheet['!rows'][i] = { hpt: 75.00 };
                 }
             }
+            
+            // 设置单元格样式
+            for (let row = 0; row < rowCount; row++) {
+                if (titleRows.has(row)) {
+                    // 考场标题行样式：宋体20号加粗居中，浅蓝底色
+                    const titleCellAddr = XLSX.utils.encode_cell({ r: row, c: 0 });
+                    if (seatPrintWorksheet[titleCellAddr]) {
+                        seatPrintWorksheet[titleCellAddr].s = {
+                            font: {
+                                name: '宋体',
+                                sz: 20,
+                                bold: true,
+                                charset: 134
+                            },
+                            alignment: {
+                                vertical: 'center',
+                                horizontal: 'center'
+                            },
+                            fill: {
+                                fgColor: { rgb: 'D9E1F2' }
+                            },
+                            border: {
+                                top: { style: 'thin', color: { rgb: '000000' } },
+                                bottom: { style: 'thin', color: { rgb: '000000' } },
+                                left: { style: 'thin', color: { rgb: '000000' } },
+                                right: { style: 'thin', color: { rgb: '000000' } }
+                            }
+                        };
+                    }
+                } else {
+                    // 学生数据行：4列分别设置样式
+                    for (let c = 0; c < 4; c++) {
+                        const cellAddr = XLSX.utils.encode_cell({ r: row, c: c });
+                        if (seatPrintWorksheet[cellAddr] && seatPrintWorksheet[cellAddr].v !== '' && seatPrintWorksheet[cellAddr].v !== undefined) {
+                            if (!seatPrintWorksheet[cellAddr].s) seatPrintWorksheet[cellAddr].s = {};
+                            seatPrintWorksheet[cellAddr].s.font = {
+                                name: '宋体',
+                                sz: 20,
+                                bold: true,
+                                charset: 134
+                            };
+                            seatPrintWorksheet[cellAddr].s.alignment = {
+                                vertical: 'center',
+                                horizontal: 'center'
+                            };
+                        }
+                    }
+                }
+            }
+            
+            // 设置打印方向为横向（landscape）
+            seatPrintWorksheet['!pageSetup'] = {
+                orientation: 'landscape',
+                fitToWidth: 1,
+                fitToHeight: 0
+            };
+            // 打印时水平居中
+            seatPrintWorksheet['!printOptions'] = {
+                horizontalCentered: true
+            };
             
             // 添加工作表到工作簿
             XLSX.utils.book_append_sheet(seatPrintWorkbook, seatPrintWorksheet, '座位表打印');
