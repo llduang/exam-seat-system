@@ -1587,7 +1587,7 @@
             // 设置单元格样式
             for (let row = 0; row < rowCount; row++) {
                 if (titleRows.has(row)) {
-                    // 考场标题行样式：宋体20号加粗居中，浅蓝底色
+                    // 考场标题行样式：宋体20号加粗居中，无底色（透明）
                     const titleCellAddr = XLSX.utils.encode_cell({ r: row, c: 0 });
                     if (seatPrintWorksheet[titleCellAddr]) {
                         seatPrintWorksheet[titleCellAddr].s = {
@@ -1600,9 +1600,6 @@
                             alignment: {
                                 vertical: 'center',
                                 horizontal: 'center'
-                            },
-                            fill: {
-                                fgColor: { rgb: 'D9E1F2' }
                             },
                             border: {
                                 top: { style: 'thin', color: { rgb: '000000' } },
