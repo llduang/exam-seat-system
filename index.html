@@ -170,11 +170,13 @@
         }
         .format-selector {
             display: flex;
+            flex-wrap: wrap;
             gap: 20px;
             margin-bottom: 20px;
         }
         .format-option {
             flex: 1;
+            min-width: 180px;
             padding: 15px;
             border: 1px solid #ddd;
             border-radius: 5px;
@@ -422,6 +424,129 @@
         .finish-btn:hover {
             background-color: #0069d9;
         }
+        /* 考号构成配置 */
+        .comp-row {
+            display: flex;
+            align-items: center;
+            flex-wrap: wrap;
+            gap: 10px;
+            padding: 10px 12px;
+            border: 1px solid #e0e4e8;
+            border-radius: 6px;
+            margin-bottom: 8px;
+            background-color: #fafbfc;
+        }
+        .comp-row.disabled {
+            background-color: #f5f5f5;
+            opacity: 0.6;
+        }
+        .comp-row .comp-check {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            font-weight: bold;
+            color: #2c3e50;
+            margin: 0;
+            min-width: 96px;
+            font-size: 15px;
+        }
+        .comp-row .comp-check input[type="checkbox"] {
+            width: 18px;
+            height: 18px;
+            cursor: pointer;
+            flex: none;
+        }
+        .comp-row .comp-prefix-value {
+            width: 150px;
+            padding: 8px 10px;
+            border: 1px solid #ddd;
+            border-radius: 5px;
+            font-size: 15px;
+        }
+        .comp-row .comp-param {
+            color: #555;
+            font-size: 14px;
+            display: flex;
+            align-items: center;
+            gap: 6px;
+        }
+        .comp-row .comp-param select {
+            width: auto;
+            padding: 6px 8px;
+        }
+        .comp-controls {
+            margin-left: auto;
+            display: flex;
+            gap: 6px;
+        }
+        .move-btn {
+            min-width: 44px;
+            min-height: 38px;
+            padding: 6px 14px;
+            background-color: #95a5a6;
+            font-size: 16px;
+            line-height: 1;
+        }
+        .move-btn:hover {
+            background-color: #7f8c8d;
+        }
+        .exam-preview {
+            margin-top: 12px;
+            padding: 12px 15px;
+            background-color: #eef6fd;
+            border: 1px solid #bee5eb;
+            border-radius: 6px;
+            color: #0c5460;
+            font-size: 15px;
+        }
+        .exam-preview .preview-value {
+            font-weight: bold;
+            font-size: 17px;
+            letter-spacing: 1px;
+            color: #2c3e50;
+        }
+        .preview-warning {
+            color: #856404;
+            font-size: 13px;
+            margin-top: 6px;
+            line-height: 1.6;
+        }
+        /* 班级识别信息 */
+        .class-info-box {
+            margin-top: 15px;
+            padding: 15px;
+            background-color: #f8f9fa;
+            border: 1px solid #e9ecef;
+            border-radius: 6px;
+            display: none;
+        }
+        .class-info-box.visible {
+            display: block;
+        }
+        .class-info-box .class-info-title {
+            font-weight: bold;
+            color: #2c3e50;
+            margin-bottom: 10px;
+        }
+        .class-tags {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 6px;
+        }
+        .class-tag {
+            display: inline-block;
+            padding: 3px 12px;
+            background-color: #e3f2fd;
+            color: #1a5276;
+            border-radius: 12px;
+            font-size: 13px;
+        }
+        .class-info-note {
+            margin-top: 10px;
+            font-size: 13px;
+            color: #856404;
+            line-height: 1.7;
+        }
     </style>
 </head>
 <body>
@@ -429,8 +554,8 @@
         <h1>考场座位分配系统</h1>
         
         <div class="form-group">
-            <label for="excelFile">上传学生名单Excel文件：</label>
-            <input type="file" id="excelFile" accept=".xlsx, .xls">
+            <label for="excelFile">上传学生名单Excel文件（可同时选择多个文件）：</label>
+            <input type="file" id="excelFile" accept=".xlsx, .xls" multiple>
         </div>
         
         <div class="form-group">
@@ -443,6 +568,10 @@
                 <div class="format-option" data-format="single-sheet">
                     <h3>单工作表格式</h3>
                     <p>一个工作表包含所有学生，有"姓名"和"班级"列</p>
+                </div>
+                <div class="format-option" data-format="multi-file">
+                    <h3>多文件格式</h3>
+                    <p>每个班级一个Excel文件，班级名从文件名识别（如"02.xlsx"即02班），文件内第一列为学生姓名</p>
                 </div>
             </div>
             
@@ -459,7 +588,14 @@
                         <option value="">请选择列</option>
                     </select>
                 </div>
+                <div class="help-text">多个文件同时上传时按第一个文件的列名解析，所有文件需保持相同的列结构</div>
             </div>
+        </div>
+        
+        <div class="class-info-box" id="classInfoBox">
+            <div class="class-info-title" id="classInfoTitle"></div>
+            <div class="class-tags" id="classInfoTags"></div>
+            <div class="class-info-note" id="classInfoNotes"></div>
         </div>
         
         <div class="classroom-settings">
@@ -472,11 +608,63 @@
                 <label for="seatCount">每个考场座位数：</label>
                 <input type="number" id="seatCount" min="1" value="25">
             </div>
-            
-            <div class="form-group">
-                <label for="examPrefix">考号前缀：</label>
-                <input type="text" id="examPrefix" value="806" maxlength="10">
-                <div class="help-text">考号前缀将作为每个考号的开头部分，如"806"或"2025"</div>
+        </div>
+        
+        <div class="form-group">
+            <label>考号构成（默认：前缀 + 班级 + 考场 + 座位号，可调整顺序或去掉某些构成项）：</label>
+            <div id="examNumberComponents">
+                <div class="comp-row" data-comp="prefix">
+                    <label class="comp-check"><input type="checkbox" class="comp-enabled" checked> 前缀</label>
+                    <input type="text" class="comp-prefix-value" value="806" maxlength="10" placeholder="如 806 或 2025">
+                    <div class="comp-controls">
+                        <button type="button" class="move-btn move-up" title="上移">↑</button>
+                        <button type="button" class="move-btn move-down" title="下移">↓</button>
+                    </div>
+                </div>
+                <div class="comp-row" data-comp="class">
+                    <label class="comp-check"><input type="checkbox" class="comp-enabled" checked> 班级</label>
+                    <span class="comp-param">编号 <select class="comp-width">
+                        <option value="1">1</option>
+                        <option value="2" selected>2</option>
+                        <option value="3">3</option>
+                    </select> 位数</span>
+                    <div class="comp-controls">
+                        <button type="button" class="move-btn move-up" title="上移">↑</button>
+                        <button type="button" class="move-btn move-down" title="下移">↓</button>
+                    </div>
+                </div>
+                <div class="comp-row" data-comp="room">
+                    <label class="comp-check"><input type="checkbox" class="comp-enabled" checked> 考场</label>
+                    <span class="comp-param">编号 <select class="comp-width">
+                        <option value="1">1</option>
+                        <option value="2" selected>2</option>
+                        <option value="3">3</option>
+                    </select> 位数</span>
+                    <div class="comp-controls">
+                        <button type="button" class="move-btn move-up" title="上移">↑</button>
+                        <button type="button" class="move-btn move-down" title="下移">↓</button>
+                    </div>
+                </div>
+                <div class="comp-row" data-comp="seat">
+                    <label class="comp-check"><input type="checkbox" class="comp-enabled" checked> 座位号</label>
+                    <span class="comp-param">编号 <select class="comp-width">
+                        <option value="1">1</option>
+                        <option value="2" selected>2</option>
+                        <option value="3">3</option>
+                    </select> 位数</span>
+                    <div class="comp-controls">
+                        <button type="button" class="move-btn move-up" title="上移">↑</button>
+                        <button type="button" class="move-btn move-down" title="下移">↓</button>
+                    </div>
+                </div>
+            </div>
+            <div class="form-group" style="margin-top: 12px; margin-bottom: 0;">
+                <label for="examSeparator">考号分隔符（可选，默认不使用）：</label>
+                <input type="text" id="examSeparator" value="" maxlength="3" placeholder="如 - ，留空则各部分直接相连">
+            </div>
+            <div class="exam-preview">
+                考号示例：<span class="preview-value" id="examNumberPreview"></span>
+                <div class="preview-warning" id="examNumberPreviewWarning" style="display: none;"></div>
             </div>
         </div>
         
@@ -631,8 +819,11 @@
         let classStats = {}; // 存储班级统计信息
         let unassignedStudents = []; // 存储未分配的学生信息
         let currentUnassignedIndex = 0; // 当前处理的未分配学生索引
+        let manuallyAssignedCount = 0; // 本次手动分配的学生数
+        let manuallySkippedStudents = []; // 本次跳过的学生列表
         let additionalSeats = {}; // 存储额外添加的座位信息
-        let classNameToNumber = {}; // 班级名称到数字标识的映射
+        let classNameToNumber = {}; // 班级名称到班级号（数字）的映射
+        let loadedWorkbookFiles = []; // 已加载的Excel文件缓存 [{fileName, workbook}]
         
         // 初始化座位号显示
         function initializeSeatOrder() {
@@ -661,6 +852,414 @@
             }, 5000);
         }
 
+        // ============ 班级识别与考号构成核心逻辑（纯函数） ============
+        // [EXAM-CORE-START]
+        // 解析单个班级名称：提取班级号（取最后一组数字）与文字标签
+        // "1"→(num=1,label='') "02"→(2,'') "1班"→(1,'班') "高一(3)班"→(3,'高一班') "甲班"→(null,'甲班')
+        function examParseClassToken(raw) {
+            if (raw === undefined || raw === null) return null;
+            const s = String(raw).trim();
+            if (!s) return null;
+            const groups = s.match(/\d+/g);
+            let digitLen = 0;
+            let num = null;
+            let label = s;
+            if (groups && groups.length > 0) {
+                const digitStr = groups[groups.length - 1];
+                digitLen = digitStr.length;
+                num = parseInt(digitStr, 10);
+                const idx = s.lastIndexOf(digitStr);
+                label = s.slice(0, idx) + s.slice(idx + digitStr.length);
+            }
+            label = label.replace(/[（(]\s*[）)]/g, '');
+            label = label.replace(/\s+/g, '');
+            return { raw: s, num: num, label: label, digitLen: digitLen };
+        }
+
+        // 班级名称归一化：
+        // 1. "1"与"01"、"02"与"2"这类同一班级的不同写法自动合并
+        // 2. 按文字标签+班级号排序（"10"排在"2"之后，而不是字符串序）
+        // 3. 班级号优先取名称中的真实数字；无数字或编号冲突时自动顺延
+        function examNormalizeClassGroups(rawNames) {
+            const groupsMap = {};
+            const orderKeys = [];
+            (rawNames || []).forEach(function (name) {
+                const token = examParseClassToken(name);
+                if (!token) return;
+                const key = token.num === null ? ('~' + token.raw) : (token.label + '#' + token.num);
+                if (!groupsMap[key]) {
+                    groupsMap[key] = { label: token.label, num: token.num, forms: {}, maxDigitLen: 0, firstRaw: token.raw };
+                    orderKeys.push(key);
+                }
+                const g = groupsMap[key];
+                g.forms[token.raw] = (g.forms[token.raw] || 0) + 1;
+                if (token.digitLen > g.maxDigitLen) g.maxDigitLen = token.digitLen;
+            });
+
+            const groupList = orderKeys.map(function (k) { return groupsMap[k]; });
+
+            // 统一补零位数：至少2位
+            let width = 2;
+            groupList.forEach(function (g) {
+                if (g.num !== null && g.maxDigitLen > width) width = g.maxDigitLen;
+            });
+
+            // 排序：先按文字标签，再按数字大小；无数字的排最后
+            groupList.sort(function (a, b) {
+                const aHasNum = a.num !== null;
+                const bHasNum = b.num !== null;
+                if (aHasNum && bHasNum) {
+                    if (a.label !== b.label) return a.label.localeCompare(b.label, 'zh');
+                    return a.num - b.num;
+                }
+                if (aHasNum !== bHasNum) return aHasNum ? -1 : 1;
+                return a.firstRaw.localeCompare(b.firstRaw, 'zh');
+            });
+
+            let maxNum = 0;
+            groupList.forEach(function (g) {
+                if (g.num !== null && g.num > maxNum) maxNum = g.num;
+            });
+
+            const usedNumbers = {};
+            const numberOwner = {};
+            const merges = [];
+            const notes = [];
+            const groups = groupList.map(function (g) {
+                const formKeys = Object.keys(g.forms);
+                // 显示名：纯数字班级显示补零后的编号；带文字的班级保留原始写法（多种写法时取出现最多、位数最长的）
+                let display;
+                if (g.num === null) {
+                    display = formKeys[0];
+                } else if (g.label === '') {
+                    display = String(g.num).padStart(width, '0');
+                } else {
+                    display = formKeys.slice().sort(function (x, y) {
+                        const diff = g.forms[y] - g.forms[x];
+                        if (diff !== 0) return diff;
+                        return examParseClassToken(y).digitLen - examParseClassToken(x).digitLen;
+                    })[0];
+                }
+                // 班级号
+                let classNumber;
+                if (g.num !== null && !usedNumbers[g.num]) {
+                    classNumber = g.num;
+                } else {
+                    if (g.num !== null) {
+                        notes.push('“' + display + '”与“' + numberOwner[g.num] + '”的班级号相同（' + g.num + '），已自动改为 ' + (maxNum + 1));
+                    } else {
+                        notes.push('“' + display + '”名称中不含数字，已自动编号为 ' + (maxNum + 1));
+                    }
+                    maxNum += 1;
+                    classNumber = maxNum;
+                }
+                usedNumbers[classNumber] = true;
+                numberOwner[classNumber] = display;
+                if (formKeys.length > 1) {
+                    merges.push({ display: display, forms: formKeys });
+                }
+                return {
+                    display: display,
+                    classNumber: classNumber,
+                    paddedNumber: String(classNumber).padStart(width, '0'),
+                    rawForms: formKeys
+                };
+            });
+
+            const rawToDisplay = {};
+            groups.forEach(function (g) {
+                g.rawForms.forEach(function (r) { rawToDisplay[r] = g.display; });
+            });
+            return { groups: groups, width: width, merges: merges, notes: notes, rawToDisplay: rawToDisplay };
+        }
+
+        // 按构成项拼接考号各部分
+        function examComposeParts(components, classNumber, room, seat) {
+            const parts = [];
+            (components || []).forEach(function (comp) {
+                if (!comp || !comp.enabled) return;
+                if (comp.type === 'prefix') {
+                    if (comp.value) parts.push(comp.value);
+                } else if (comp.type === 'class') {
+                    parts.push(String(classNumber).padStart(comp.width, '0'));
+                } else if (comp.type === 'room') {
+                    parts.push(String(room).padStart(comp.width, '0'));
+                } else if (comp.type === 'seat') {
+                    parts.push(String(seat).padStart(comp.width, '0'));
+                }
+            });
+            return parts;
+        }
+
+        // 生成考号
+        function examComposeNumber(components, separator, classNumber, room, seat) {
+            return examComposeParts(components, classNumber, room, seat).join(separator || '');
+        }
+        // [EXAM-CORE-END]
+
+        // 读取考号构成配置
+        function getExamNumberConfig() {
+            const rows = Array.from(document.querySelectorAll('#examNumberComponents .comp-row'));
+            const components = rows.map(function (row) {
+                const type = row.getAttribute('data-comp');
+                const comp = {
+                    type: type,
+                    enabled: row.querySelector('.comp-enabled').checked,
+                    value: '',
+                    width: 2
+                };
+                const prefixInput = row.querySelector('.comp-prefix-value');
+                if (prefixInput) comp.value = prefixInput.value.trim();
+                const widthSelect = row.querySelector('.comp-width');
+                if (widthSelect) comp.width = parseInt(widthSelect.value, 10) || 2;
+                return comp;
+            });
+            return {
+                components: components,
+                separator: document.getElementById('examSeparator').value || ''
+            };
+        }
+
+        // 更新考号示例预览
+        function updateExamNumberPreview() {
+            const config = getExamNumberConfig();
+            const parts = examComposeParts(config.components, 1, 1, 1);
+            const previewEl = document.getElementById('examNumberPreview');
+            if (parts.length === 0) {
+                previewEl.textContent = '（未选择任何构成项）';
+            } else {
+                const visual = parts.join(config.separator || ' ');
+                const final = parts.join(config.separator);
+                previewEl.textContent = visual + '  →  ' + final;
+            }
+
+            // 位数预警
+            const warnings = [];
+            const findComp = function (type) {
+                return config.components.find(function (c) { return c.type === type && c.enabled; });
+            };
+            const roomComp = findComp('room');
+            if (roomComp) {
+                const roomCount = parseInt(document.getElementById('classroomCount').value, 10) || 0;
+                const roomMax = Math.pow(10, roomComp.width) - 1;
+                if (roomCount > roomMax) {
+                    warnings.push('考场数 ' + roomCount + ' 已超过 ' + roomComp.width + ' 位数，考号中考场编号将以 ' + String(roomCount).length + ' 位显示');
+                }
+            }
+            const seatComp = findComp('seat');
+            if (seatComp) {
+                const seatCount = parseInt(document.getElementById('seatCount').value, 10) || 0;
+                const seatMax = Math.pow(10, seatComp.width) - 1;
+                if (seatCount > seatMax) {
+                    warnings.push('座位数 ' + seatCount + ' 已超过 ' + seatComp.width + ' 位数，考号中座位编号将以 ' + String(seatCount).length + ' 位显示');
+                }
+            }
+            const classComp = findComp('class');
+            if (classComp && Object.keys(classNameToNumber).length > 0) {
+                const numbers = Object.values(classNameToNumber);
+                const maxClassNumber = Math.max.apply(null, numbers);
+                const classMax = Math.pow(10, classComp.width) - 1;
+                if (maxClassNumber > classMax) {
+                    warnings.push('最大班级号 ' + maxClassNumber + ' 已超过 ' + classComp.width + ' 位数，考号中班级编号将以 ' + String(maxClassNumber).length + ' 位显示');
+                }
+            }
+            const warningEl = document.getElementById('examNumberPreviewWarning');
+            if (warnings.length > 0) {
+                warningEl.innerHTML = warnings.join('<br>');
+                warningEl.style.display = 'block';
+            } else {
+                warningEl.style.display = 'none';
+            }
+        }
+
+        // 绑定考号构成配置区的事件
+        function wireExamNumberComponents() {
+            const container = document.getElementById('examNumberComponents');
+            container.querySelectorAll('.comp-row').forEach(function (row) {
+                const checkbox = row.querySelector('.comp-enabled');
+                checkbox.addEventListener('change', function () {
+                    row.classList.toggle('disabled', !this.checked);
+                    updateExamNumberPreview();
+                });
+                const prefixInput = row.querySelector('.comp-prefix-value');
+                if (prefixInput) prefixInput.addEventListener('input', updateExamNumberPreview);
+                const widthSelect = row.querySelector('.comp-width');
+                if (widthSelect) widthSelect.addEventListener('change', updateExamNumberPreview);
+            });
+            container.querySelectorAll('.move-btn').forEach(function (btn) {
+                btn.addEventListener('click', function () {
+                    const row = this.closest('.comp-row');
+                    if (this.classList.contains('move-up')) {
+                        const prev = row.previousElementSibling;
+                        if (prev) container.insertBefore(row, prev);
+                    } else {
+                        const next = row.nextElementSibling;
+                        if (next) container.insertBefore(next, row);
+                    }
+                    updateExamNumberPreview();
+                });
+            });
+            document.getElementById('examSeparator').addEventListener('input', updateExamNumberPreview);
+            document.getElementById('classroomCount').addEventListener('input', updateExamNumberPreview);
+            document.getElementById('seatCount').addEventListener('input', updateExamNumberPreview);
+        }
+
+        // 读取多个Excel文件为工作簿
+        function readFilesAsWorkbooks(fileList) {
+            const files = Array.from(fileList);
+            return Promise.all(files.map(function (file) {
+                return new Promise(function (resolve, reject) {
+                    const reader = new FileReader();
+                    reader.onload = function (e) {
+                        try {
+                            const data = new Uint8Array(e.target.result);
+                            const workbook = XLSX.read(data, { type: 'array' });
+                            resolve({ fileName: file.name, workbook: workbook });
+                        } catch (err) {
+                            reject(new Error('文件 “' + file.name + '” 读取失败: ' + err.message));
+                        }
+                    };
+                    reader.onerror = function () {
+                        reject(new Error('文件 “' + file.name + '” 读取失败'));
+                    };
+                    reader.readAsArrayBuffer(file);
+                });
+            }));
+        }
+
+        // 从文件名提取班级名（去掉扩展名）
+        function examFileBaseName(fileName) {
+            return String(fileName).replace(/\.[^.]+$/, '').trim();
+        }
+
+        // 读取工作表第一列的学生姓名（第一行为表头）
+        function readStudentNamesFromSheet(worksheet) {
+            const rows = XLSX.utils.sheet_to_json(worksheet, { header: 1 });
+            const students = [];
+            for (let i = 1; i < rows.length; i++) {
+                const row = Array.isArray(rows[i]) ? rows[i] : [];
+                if (row.length > 0 && row[0] !== undefined && row[0] !== null) {
+                    const studentName = String(row[0]).trim();
+                    if (studentName) students.push(studentName);
+                }
+            }
+            return students;
+        }
+
+        // 按当前格式从已加载文件中提取班级与学生
+        function extractClassDataFromLoaded() {
+            const rawClassNames = [];
+            const studentsByRawClass = {};
+            const addClass = function (raw) {
+                if (!(raw in studentsByRawClass)) {
+                    studentsByRawClass[raw] = [];
+                    rawClassNames.push(raw);
+                }
+            };
+
+            if (selectedFormat === 'multi-sheet') {
+                // 多工作表格式：所有文件的所有工作表，每个工作表一个班级
+                loadedWorkbookFiles.forEach(function (f) {
+                    f.workbook.SheetNames.forEach(function (sheetName) {
+                        addClass(sheetName);
+                        studentsByRawClass[sheetName] = studentsByRawClass[sheetName].concat(
+                            readStudentNamesFromSheet(f.workbook.Sheets[sheetName])
+                        );
+                    });
+                });
+            } else if (selectedFormat === 'multi-file') {
+                // 多文件格式：每个文件一个班级，班级名取自文件名，读取第一个工作表
+                loadedWorkbookFiles.forEach(function (f) {
+                    const raw = examFileBaseName(f.fileName);
+                    addClass(raw);
+                    const sheetName = f.workbook.SheetNames[0];
+                    if (sheetName) {
+                        studentsByRawClass[raw] = studentsByRawClass[raw].concat(
+                            readStudentNamesFromSheet(f.workbook.Sheets[sheetName])
+                        );
+                    }
+                });
+            } else {
+                // 单工作表格式：每个文件的第一个工作表，按所选列读取
+                const nameColumn = document.getElementById('nameColumn').value;
+                const classColumn = document.getElementById('classColumn').value;
+                if (nameColumn === '' || classColumn === '') {
+                    return { needColumns: true, rawClassNames: [], studentsByRawClass: {} };
+                }
+                const nameIdx = parseInt(nameColumn, 10);
+                const classIdx = parseInt(classColumn, 10);
+                loadedWorkbookFiles.forEach(function (f) {
+                    const sheetName = f.workbook.SheetNames[0];
+                    if (!sheetName) return;
+                    const rows = XLSX.utils.sheet_to_json(f.workbook.Sheets[sheetName], { header: 1 });
+                    for (let i = 1; i < rows.length; i++) {
+                        const row = Array.isArray(rows[i]) ? rows[i] : [];
+                        const nameValue = row[nameIdx];
+                        const classValue = row[classIdx];
+                        if (nameValue !== undefined && nameValue !== null &&
+                            classValue !== undefined && classValue !== null) {
+                            const name = String(nameValue).trim();
+                            const cls = String(classValue).trim();
+                            if (name && cls) {
+                                addClass(cls);
+                                studentsByRawClass[cls].push(name);
+                            }
+                        }
+                    }
+                });
+            }
+            return { rawClassNames: rawClassNames, studentsByRawClass: studentsByRawClass };
+        }
+
+        // 班级识别结果展示（上传后立即反馈）
+        function refreshClassRecognition() {
+            const box = document.getElementById('classInfoBox');
+            const titleEl = document.getElementById('classInfoTitle');
+            const tagsEl = document.getElementById('classInfoTags');
+            const notesEl = document.getElementById('classInfoNotes');
+            if (!loadedWorkbookFiles.length) {
+                box.classList.remove('visible');
+                return;
+            }
+            if (selectedFormat === 'single-sheet') {
+                const nameColumn = document.getElementById('nameColumn').value;
+                const classColumn = document.getElementById('classColumn').value;
+                if (nameColumn === '' || classColumn === '') {
+                    box.classList.add('visible');
+                    titleEl.textContent = '文件已加载，请选择姓名列和班级列';
+                    tagsEl.innerHTML = '';
+                    notesEl.innerHTML = '';
+                    return;
+                }
+            }
+            const extraction = extractClassDataFromLoaded();
+            if (!extraction.rawClassNames.length) {
+                box.classList.add('visible');
+                titleEl.textContent = '未能识别到班级，请检查文件格式或列选择是否正确';
+                tagsEl.innerHTML = '';
+                notesEl.innerHTML = '';
+                return;
+            }
+            const norm = examNormalizeClassGroups(extraction.rawClassNames);
+            box.classList.add('visible');
+            titleEl.textContent = '已识别 ' + norm.groups.length + ' 个班级（已自动统一写法并按班级号排序）：';
+            tagsEl.innerHTML = '';
+            norm.groups.forEach(function (g) {
+                const tag = document.createElement('span');
+                tag.className = 'class-tag';
+                tag.textContent = g.display;
+                tagsEl.appendChild(tag);
+            });
+            const notes = [];
+            norm.merges.forEach(function (m) {
+                notes.push('“' + m.forms.join('”、“') + '”是同一班级的不同写法，已合并为“' + m.display + '”');
+            });
+            norm.notes.forEach(function (n) { notes.push(n); });
+            notesEl.innerHTML = notes.length > 0
+                ? notes.map(function (n) { return '• ' + n; }).join('<br>')
+                : '';
+        }
+
         // 格式选择器事件处理
         document.querySelectorAll('.format-option').forEach(option => {
             option.addEventListener('click', function() {
@@ -670,13 +1269,16 @@
                 this.classList.add('selected');
                 selectedFormat = this.dataset.format;
                 
-                // 显示或隐藏列映射选项
+                // 显示或隐藏列映射选项（仅单工作表格式需要选择列）
                 const columnMapping = document.getElementById('columnMapping');
                 if (selectedFormat === 'single-sheet') {
                     columnMapping.style.display = 'block';
                 } else {
                     columnMapping.style.display = 'none';
                 }
+                
+                // 切换格式后重新识别班级
+                refreshClassRecognition();
             });
         });
 
@@ -704,91 +1306,106 @@
             });
         });
 
-        // 文件上传处理
-        document.getElementById('excelFile').addEventListener('change', function(e) {
-            const file = e.target.files[0];
-            if (!file) return;
+        // 更新单工作表格式的列选择下拉框（基于第一个已加载文件）
+        function populateColumnSelects() {
+            if (!loadedWorkbookFiles.length) return;
+            const workbook = loadedWorkbookFiles[0].workbook;
+            const firstSheetName = workbook.SheetNames[0];
+            if (!firstSheetName) return;
+            const worksheet = workbook.Sheets[firstSheetName];
+            const jsonData = XLSX.utils.sheet_to_json(worksheet, { header: 1 });
             
-            const reader = new FileReader();
-            reader.onload = function(event) {
-                try {
-                    const data = new Uint8Array(event.target.result);
-                    const workbook = XLSX.read(data, { type: 'array' });
+            if (jsonData.length > 0) {
+                // 确保第一行是数组
+                const firstRow = Array.isArray(jsonData[0]) ? jsonData[0] : [];
+                columnHeaders = firstRow.map(header => {
+                    // 确保每个标题都是字符串
+                    if (header === undefined || header === null) return '';
+                    return String(header);
+                });
+                
+                // 更新列选择下拉框
+                const nameColumnSelect = document.getElementById('nameColumn');
+                const classColumnSelect = document.getElementById('classColumn');
+                
+                nameColumnSelect.innerHTML = '<option value="">请选择列</option>';
+                classColumnSelect.innerHTML = '<option value="">请选择列</option>';
+                
+                columnHeaders.forEach((header, index) => {
+                    const headerText = header || `列 ${index + 1}`;
+                    const nameOption = document.createElement('option');
+                    nameOption.value = index;
+                    nameOption.textContent = headerText;
+                    nameColumnSelect.appendChild(nameOption);
                     
-                    // 如果是单工作表格式，获取列标题
-                    if (selectedFormat === 'single-sheet') {
-                        const firstSheetName = workbook.SheetNames[0];
-                        const worksheet = workbook.Sheets[firstSheetName];
-                        const jsonData = XLSX.utils.sheet_to_json(worksheet, { header: 1 });
-                        
-                        if (jsonData.length > 0) {
-                            // 确保第一行是数组
-                            const firstRow = Array.isArray(jsonData[0]) ? jsonData[0] : [];
-                            columnHeaders = firstRow.map(header => {
-                                // 确保每个标题都是字符串
-                                if (header === undefined || header === null) return '';
-                                return String(header);
-                            });
-                            
-                            // 更新列选择下拉框
-                            const nameColumnSelect = document.getElementById('nameColumn');
-                            const classColumnSelect = document.getElementById('classColumn');
-                            
-                            nameColumnSelect.innerHTML = '<option value="">请选择列</option>';
-                            classColumnSelect.innerHTML = '<option value="">请选择列</option>';
-                            
-                            columnHeaders.forEach((header, index) => {
-                                const headerText = header || `列 ${index + 1}`;
-                                const nameOption = document.createElement('option');
-                                nameOption.value = index;
-                                nameOption.textContent = headerText;
-                                nameColumnSelect.appendChild(nameOption);
-                                
-                                const classOption = document.createElement('option');
-                                classOption.value = index;
-                                classOption.textContent = headerText;
-                                classColumnSelect.appendChild(classOption);
-                            });
-                            
-                            // 尝试自动匹配列
-                            const nameIndex = columnHeaders.findIndex(h => {
-                                if (!h) return false;
-                                try {
-                                    const headerStr = String(h).toLowerCase();
-                                    return headerStr.includes('姓名') || headerStr.includes('名字') || headerStr.includes('name');
-                                } catch (e) {
-                                    return false;
-                                }
-                            });
-                            const classIndex = columnHeaders.findIndex(h => {
-                                if (!h) return false;
-                                try {
-                                    const headerStr = String(h).toLowerCase();
-                                    return headerStr.includes('班级') || headerStr.includes('级') || headerStr.includes('class');
-                                } catch (e) {
-                                    return false;
-                                }
-                            });
-                            
-                            if (nameIndex !== -1) nameColumnSelect.value = nameIndex;
-                            if (classIndex !== -1) classColumnSelect.value = classIndex;
-                        }
+                    const classOption = document.createElement('option');
+                    classOption.value = index;
+                    classOption.textContent = headerText;
+                    classColumnSelect.appendChild(classOption);
+                });
+                
+                // 尝试自动匹配列
+                const nameIndex = columnHeaders.findIndex(h => {
+                    if (!h) return false;
+                    try {
+                        const headerStr = String(h).toLowerCase();
+                        return headerStr.includes('姓名') || headerStr.includes('名字') || headerStr.includes('name');
+                    } catch (e) {
+                        return false;
                     }
-                    
-                    showStatusMessage('文件已成功加载，可以开始生成考场分配表', 'success');
-                } catch (error) {
-                    showStatusMessage('读取文件时出错: ' + error.message, 'error');
+                });
+                const classIndex = columnHeaders.findIndex(h => {
+                    if (!h) return false;
+                    try {
+                        const headerStr = String(h).toLowerCase();
+                        return headerStr.includes('班级') || headerStr.includes('级') || headerStr.includes('class');
+                    } catch (e) {
+                        return false;
+                    }
+                });
+                
+                if (nameIndex !== -1) nameColumnSelect.value = nameIndex;
+                if (classIndex !== -1) classColumnSelect.value = classIndex;
+            }
+        }
+
+        // 文件上传处理（支持多文件）
+        document.getElementById('excelFile').addEventListener('change', function(e) {
+            const files = e.target.files;
+            if (!files || !files.length) return;
+            
+            readFilesAsWorkbooks(files).then(function (loadedFiles) {
+                loadedWorkbookFiles = loadedFiles;
+                
+                // 单工作表格式：用第一个文件的表头更新列选择
+                if (selectedFormat === 'single-sheet') {
+                    populateColumnSelects();
                 }
-            };
-            reader.readAsArrayBuffer(file);
+                
+                // 立即识别并展示班级情况
+                refreshClassRecognition();
+                
+                showStatusMessage(
+                    loadedFiles.length > 1
+                        ? '已成功加载 ' + loadedFiles.length + ' 个文件，可以开始生成考场分配表'
+                        : '文件已成功加载，可以开始生成考场分配表',
+                    'success'
+                );
+            }).catch(function (error) {
+                showStatusMessage('读取文件时出错: ' + error.message, 'error');
+            });
         });
+        
+        // 列选择变化时重新识别班级（单工作表格式）
+        document.getElementById('nameColumn').addEventListener('change', refreshClassRecognition);
+        document.getElementById('classColumn').addEventListener('change', refreshClassRecognition);
 
         // 生成考场分配表
         function generateAssignment() {
             const fileInput = document.getElementById('excelFile');
             const classroomCount = parseInt(document.getElementById('classroomCount').value);
             const seatCount = parseInt(document.getElementById('seatCount').value);
-            const examPrefix = document.getElementById('examPrefix').value.trim();
+            const examConfig = getExamNumberConfig();
             
             if (!fileInput.files.length) {
                 showStatusMessage('请先上传学生名单Excel文件', 'error');
@@ -800,8 +1417,14 @@
                 return;
             }
             
-            if (!examPrefix) {
-                showStatusMessage('请输入考号前缀', 'error');
+            // 校验考号构成配置
+            if (!examConfig.components.some(c => c.enabled)) {
+                showStatusMessage('请至少勾选一个考号构成项（前缀、班级、考场或座位号）', 'error');
+                return;
+            }
+            const prefixComp = examConfig.components.find(c => c.type === 'prefix');
+            if (prefixComp && prefixComp.enabled && !prefixComp.value) {
+                showStatusMessage('已勾选“前缀”构成项，请填写前缀内容，或取消勾选前缀', 'error');
                 return;
             }
             
@@ -818,132 +1441,44 @@
             const loadingElement = document.getElementById('loading');
             loadingElement.style.display = 'block';
             
-            const file = fileInput.files[0];
-            const reader = new FileReader();
-            
-            reader.onload = function(e) {
+            readFilesAsWorkbooks(fileInput.files).then(function (loadedFiles) {
                 try {
-                    const data = new Uint8Array(e.target.result);
-                    const workbook = XLSX.read(data, { type: 'array' });
+                    loadedWorkbookFiles = loadedFiles;
                     
-                    // 根据选择的格式读取数据
+                    // 根据选择的格式提取班级与学生
                     let classData = {};
                     let classSizes = {};
                     unassignedStudents = []; // 重置未分配学生列表
                     additionalSeats = {}; // 重置额外座位信息
                     
-                    if (selectedFormat === 'multi-sheet') {
-                        // 多工作表格式：每个工作表代表一个班级
-                        classNames = workbook.SheetNames;
-                        if (classNames.length === 0) {
-                            showStatusMessage('Excel文件中没有找到任何班级数据', 'error');
-                            loadingElement.style.display = 'none';
-                            return;
-                        }
-                        
-                        // 【修复】对班级名称进行排序，确保顺序一致
-                        classNames.sort();
-                        
-                        // 读取每个班级的数据
-                        classNames.forEach(className => {
-                            const worksheet = workbook.Sheets[className];
-                            const jsonData = XLSX.utils.sheet_to_json(worksheet, { header: 1 });
-                            
-                            // 假设第一行是标题，第二行开始是学生数据
-                            const students = [];
-                            for (let i = 1; i < jsonData.length; i++) {
-                                // 确保行是数组
-                                const row = Array.isArray(jsonData[i]) ? jsonData[i] : [];
-                                // 确保单元格值存在且转换为字符串
-                                if (row.length > 0 && row[0] !== undefined && row[0] !== null) {
-                                    try {
-                                        const studentName = String(row[0]).trim();
-                                        if (studentName) {
-                                            students.push(studentName);
-                                        }
-                                    } catch (e) {
-                                        console.error('处理学生姓名时出错:', e);
-                                    }
-                                }
-                            }
-                            
-                            classData[className] = students;
-                            classSizes[className] = students.length;
-                        });
-                    } else {
-                        // 单工作表格式：一个工作表包含所有学生
-                        const firstSheetName = workbook.SheetNames[0];
-                        const worksheet = workbook.Sheets[firstSheetName];
-                        const jsonData = XLSX.utils.sheet_to_json(worksheet, { header: 1 });
-                        
-                        const nameColumnIndex = parseInt(document.getElementById('nameColumn').value);
-                        const classColumnIndex = parseInt(document.getElementById('classColumn').value);
-                        
-                        // 收集所有班级名称
-                        const uniqueClasses = new Set();
-                        for (let i = 1; i < jsonData.length; i++) {
-                            // 确保行是数组
-                            const row = Array.isArray(jsonData[i]) ? jsonData[i] : [];
-                            if (row.length > Math.max(nameColumnIndex, classColumnIndex)) {
-                                try {
-                                    const classValue = row[classColumnIndex];
-                                    if (classValue !== undefined && classValue !== null) {
-                                        const className = String(classValue).trim();
-                                        if (className) {
-                                            uniqueClasses.add(className);
-                                        }
-                                    }
-                                } catch (e) {
-                                    console.error('处理班级名称时出错:', e);
-                                }
-                            }
-                        }
-                        
-                        classNames = Array.from(uniqueClasses);
-                        
-                        // 【修复】对班级名称进行排序，确保顺序一致
-                        classNames.sort();
-                        
-                        // 初始化班级数据
-                        classNames.forEach(className => {
-                            classData[className] = [];
-                        });
-                        
-                        // 读取学生数据
-                        for (let i = 1; i < jsonData.length; i++) {
-                            // 确保行是数组
-                            const row = Array.isArray(jsonData[i]) ? jsonData[i] : [];
-                            if (row.length > Math.max(nameColumnIndex, classColumnIndex)) {
-                                try {
-                                    const nameValue = row[nameColumnIndex];
-                                    const classValue = row[classColumnIndex];
-                                    
-                                    if (nameValue !== undefined && nameValue !== null && 
-                                        classValue !== undefined && classValue !== null) {
-                                        const name = String(nameValue).trim();
-                                        const className = String(classValue).trim();
-                                        
-                                        if (name && className && classData[className]) {
-                                            classData[className].push(name);
-                                        }
-                                    }
-                                } catch (e) {
-                                    console.error('处理学生数据时出错:', e);
-                                }
-                            }
-                        }
-                        
-                        // 计算每个班级的学生数量
-                        classNames.forEach(className => {
-                            classSizes[className] = classData[className].length;
-                        });
+                    const extraction = extractClassDataFromLoaded();
+                    if (!extraction.rawClassNames.length) {
+                        showStatusMessage('未能从文件中识别出任何班级，请检查文件格式设置是否正确', 'error');
+                        loadingElement.style.display = 'none';
+                        return;
                     }
                     
-                    // 创建班级名称到数字标识的映射字典
+                    // 班级名称归一化：合并同一班级的不同写法，按班级号排序
+                    const norm = examNormalizeClassGroups(extraction.rawClassNames);
+                    
+                    // 以归一化后的班级显示名为键构建数据
+                    classNames = [];
                     classNameToNumber = {};
-                    classNames.forEach((name, index) => {
-                        classNameToNumber[name] = (index + 1).toString().padStart(2, '0');
+                    norm.groups.forEach(function (g) {
+                        classNames.push(g.display);
+                        classData[g.display] = [];
+                        classNameToNumber[g.display] = g.classNumber;
                     });
+                    extraction.rawClassNames.forEach(function (raw) {
+                        const display = norm.rawToDisplay[raw];
+                        classData[display] = classData[display].concat(extraction.studentsByRawClass[raw]);
+                    });
+                    classNames.forEach(className => {
+                        classSizes[className] = classData[className].length;
+                    });
+                    
+                    // 同步班级识别信息展示
+                    refreshClassRecognition();
                     
                     // 生成座位号列表
                     const seatOrder = Array.from({ length: seatCount }, (_, i) => i + 1);
@@ -982,8 +1517,11 @@
                             const classroomNumber = Math.floor(seatCounter / studentsPerClassroom) + 1;
                             const seatNumber = seatOrder[seatCounter % studentsPerClassroom];
                             
-                            // 生成考号 格式为"前缀 + 班级标识 + 考场号 + 座位号"
-                            const examNumber = `${examPrefix}${classNameToNumber[className]}${classroomNumber.toString().padStart(2, '0')}${seatNumber.toString().padStart(2, '0')}`;
+                            // 生成考号：按“考号构成”配置的顺序与位数拼接
+                            const examNumber = examComposeNumber(
+                                examConfig.components, examConfig.separator,
+                                classNameToNumber[className], classroomNumber, seatNumber
+                            );
                             
                             // 存储分配结果
                             assignments.push({
@@ -1025,7 +1563,10 @@
                                 }
                                 
                                 // 生成考号
-                                const examNumber = `${examPrefix}${classNameToNumber[className]}${classroomNumber.toString().padStart(2, '0')}${seatNumber.toString().padStart(2, '0')}`;
+                                const examNumber = examComposeNumber(
+                                    examConfig.components, examConfig.separator,
+                                    classNameToNumber[className], classroomNumber, seatNumber
+                                );
                                 
                                 // 存储分配结果
                                 assignments.push({
@@ -1083,9 +1624,10 @@
                     showStatusMessage('处理文件时出错: ' + error.message, 'error');
                     loadingElement.style.display = 'none';
                 }
-            };
-            
-            reader.readAsArrayBuffer(file);
+            }).catch(function (error) {
+                showStatusMessage('处理文件时出错: ' + error.message, 'error');
+                loadingElement.style.display = 'none';
+            });
         }
 
         // 显示未分配学生处理模态框
@@ -1095,8 +1637,10 @@
             const progressInfo = document.getElementById('progressInfo');
             const finishBtn = document.getElementById('finishBtn');
             
-            // 重置索引
+            // 重置索引与统计
             currentUnassignedIndex = 0;
+            manuallyAssignedCount = 0;
+            manuallySkippedStudents = [];
             
             // 更新进度信息
             progressInfo.textContent = `处理进度：0/${unassignedStudents.length}`;
@@ -1214,6 +1758,7 @@
             });
             
             skipBtn.addEventListener('click', function() {
+                manuallySkippedStudents.push(student);
                 currentUnassignedIndex++;
                 displayCurrentUnassignedStudent();
             });
@@ -1244,10 +1789,13 @@
 
         // 分配未分配学生
         function assignUnassignedStudent(student, classroomNumber, seatNumber) {
-            const examPrefix = document.getElementById('examPrefix').value.trim();
+            const examConfig = getExamNumberConfig();
             
-            // 生成考号
-            const examNumber = `${examPrefix}${classNameToNumber[student.class]}${classroomNumber.toString().padStart(2, '0')}${seatNumber.toString().padStart(2, '0')}`;
+            // 按当前考号构成配置生成考号
+            const examNumber = examComposeNumber(
+                examConfig.components, examConfig.separator,
+                classNameToNumber[student.class], classroomNumber, seatNumber
+            );
             
             // 添加到分配列表
             assignments.push({
@@ -1266,6 +1814,8 @@
                 }
                 additionalSeats[classroomNumber].push(seatNumber);
             }
+            
+            manuallyAssignedCount++;
             
             // 更新班级统计
             classStats[student.class].assigned++;
@@ -1293,13 +1843,17 @@
             generateExcelFiles();
             
             // 显示完成消息
-            const assignedCount = unassignedStudents.length - unassignedStudents.filter((s, i) => i >= currentUnassignedIndex).length;
-            const skippedCount = unassignedStudents.filter((s, i) => i >= currentUnassignedIndex).length;
+            const assignedCount = manuallyAssignedCount;
+            const skippedCount = manuallySkippedStudents.length;
+            const remainingCount = unassignedStudents.filter((s, i) => i >= currentUnassignedIndex).length;
             
             let message = `未分配学生处理完成！<br>`;
             message += `已分配：${assignedCount}人<br>`;
             if (skippedCount > 0) {
                 message += `跳过：${skippedCount}人`;
+            }
+            if (remainingCount > 0) {
+                message += `待处理：${remainingCount}人`;
             }
             
             showStatusMessage(message, 'success');
@@ -1326,11 +1880,11 @@
                 resultTableBody.appendChild(row);
             });
             
-            // 显示未分配学生列表
+            // 显示未分配学生列表（含已跳过的学生）
             const unassignedContainer = document.getElementById('unassignedContainer');
             const unassignedList = document.getElementById('unassignedList');
             
-            const remainingUnassigned = unassignedStudents.filter((s, i) => i >= currentUnassignedIndex);
+            const remainingUnassigned = unassignedStudents.filter((s, i) => i >= currentUnassignedIndex).concat(manuallySkippedStudents);
             
             if (remainingUnassigned.length > 0) {
                 unassignedContainer.style.display = 'block';
@@ -1362,14 +1916,14 @@
             const unassignedSeats = Object.values(classStats).reduce((sum, stat) => sum + stat.unassigned, 0);
             document.getElementById('unassignedSeats').textContent = unassignedSeats;
             
-            // 更新统计表格
+            // 更新统计表格（班级顺序与分配时一致）
             const statsTableBody = document.getElementById('statsTableBody');
             statsTableBody.innerHTML = '';
             
-            // 按班级名称排序
-            const sortedClassNames = [...classNames].sort();
+            // 按班级顺序展示（已按班级号排序）
+            const orderedClassNames = [...classNames];
             
-            sortedClassNames.forEach(className => {
+            orderedClassNames.forEach(className => {
                 const stat = classStats[className];
                 const row = document.createElement('tr');
                 
@@ -1394,11 +1948,11 @@
         function updateChart() {
             const ctx = document.getElementById('classChart').getContext('2d');
             
-            // 准备图表数据
-            const sortedClassNames = [...classNames].sort();
-            const totalData = sortedClassNames.map(className => classStats[className].total);
-            const assignedData = sortedClassNames.map(className => classStats[className].assigned);
-            const unassignedData = sortedClassNames.map(className => classStats[className].unassigned);
+            // 准备图表数据（班级顺序与分配时一致）
+            const orderedClassNames = [...classNames];
+            const totalData = orderedClassNames.map(className => classStats[className].total);
+            const assignedData = orderedClassNames.map(className => classStats[className].assigned);
+            const unassignedData = orderedClassNames.map(className => classStats[className].unassigned);
             
             // 如果已有图表，先销毁
             if (window.classChart) {
@@ -1409,7 +1963,7 @@
             window.classChart = new Chart(ctx, {
                 type: 'bar',
                 data: {
-                    labels: sortedClassNames,
+                    labels: orderedClassNames,
                     datasets: [
                         {
                             label: '已分配',
@@ -1518,8 +2072,8 @@
                 }
             });
             
-            // 如果有未分配的学生，在最后添加
-            const remainingUnassigned = unassignedStudents.filter((s, i) => i >= currentUnassignedIndex);
+            // 如果有未分配/跳过的学生，在最后添加
+            const remainingUnassigned = unassignedStudents.filter((s, i) => i >= currentUnassignedIndex).concat(manuallySkippedStudents);
             if (remainingUnassigned.length > 0) {
                 // 添加一个空行作为分隔
                 seatPrintData.push(['', '', '', '']);
@@ -2012,10 +2566,10 @@
                 }
             }
             
-            // 添加简化的统计表到总表工作簿（只包含班级和参考人数）
+            // 添加简化的统计表到总表工作簿（只包含班级和参考人数，班级顺序与分配时一致）
             const statsData = [];
-            const sortedClassNames = [...classNames].sort();
-            sortedClassNames.forEach(className => {
+            const orderedClassNames = [...classNames];
+            orderedClassNames.forEach(className => {
                 const stat = classStats[className];
                 statsData.push({
                     '班级': className,
@@ -2055,6 +2609,10 @@
         document.addEventListener('DOMContentLoaded', function() {
             // 初始化座位号显示
             initializeSeatOrder();
+            
+            // 初始化考号构成配置区
+            wireExamNumberComponents();
+            updateExamNumberPreview();
             
             // 监听座位数变化
             document.getElementById('seatCount').addEventListener('change', initializeSeatOrder);
