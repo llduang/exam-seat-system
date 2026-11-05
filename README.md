@@ -1,20 +1,72 @@
 # exam-seat-system
 
-考场座位分配系统（纯前端静态页面，数据不出浏览器）。
+考场座位分配系统（纯前端静态应用，数据不出浏览器）。
+
+基于 **Next.js 16 静态导出**（`output: "export"`）+ Tailwind CSS 4，部署在 Cloudflare Pages。
+按 [free-deploy-webapp](https://github.com/) skill 的场景 A（纯前端工具）架构组织：
+无后端 Functions、无数据库、无鉴权，全部计算在浏览器完成。
 
 ## 功能
 
 - 上传学生名单，自动轮流分配考场与座位（同班学生尽量打散到不同考场）
 - 三种名单格式：
   - **多工作表格式**：每个班级一个工作表，第一列为学生姓名（支持同时上传多个文件，工作表自动合并）
-  - **单工作表格式**：一个工作表包含所有学生，选择"姓名"和"班级"列
+  - **单工作表格式**：一个工作表包含所有学生，选择“姓名”和“班级”列（上传后自动匹配列）
   - **多文件格式**：每个班级一个 Excel 文件，班级名从文件名识别（如 `02.xlsx` 即 02 班）
 - 班级写法自动识别与归一化：`1` / `01` / `02` / `2` 等同一班级的不同写法自动合并；按班级号数字排序（`10` 排在 `2` 之后）；考号中的班级编号取班级名中的真实数字；无数字或编号冲突的班级自动顺延编号
-- 考号构成可配置：前缀、班级、考场、座位号四项可任意调整顺序、单独启用/停用、设置编号位数，支持可选分隔符，并实时预览考号示例
-- 座位不足时逐个手动处理未分配学生（补座位或跳过）
-- 下载：总表、各班级分配表、各考场分配表、座位表打印（横向、红纸打印适配）、考场座位表 PDF（每页一个考场）
-- 班级人数统计与图表
+- 考号构成可配置：前缀、班级、考场、座位号四项可任意调整顺序、单独启用/停用、设置编号位数，支持可选分隔符，并实时预览考号示例与位数预警
+- 座位不足时逐个手动处理未分配学生（含“额外座位”，或跳过）
+- 下载：总表、各班级分配表、各考场分配表、座位表打印、完整分配表（包含所有工作表）、考场座位表 PDF（每页一个考场）
+- 班级人数统计与图表（Chart.js 堆叠柱状图 + 分配率提示）
 
-## 使用
+## 项目结构
 
-浏览器直接打开 `index.html` 即可使用，无需安装任何依赖。
+```
+├── src/
+│   ├── app/                  # Next.js App Router（layout / page / globals.css）
+│   ├── components/           # UI 组件（上传、识别、设置、考号配置、结果、模态框、图表）
+│   ├── hooks/
+│   │   └── use-exam-system.ts  # 全局状态与动作（单一状态源）
+│   └── lib/                  # 纯逻辑层（可独立测试）
+│       ├── exam-core.ts      #   班级识别 / 考号构成（纯函数，45 个单元测试）
+│       ├── exam-data.ts      #   Excel 读取与班级/学生提取
+│       ├── exam-assign.ts    #   两阶段轮询分配算法
+│       ├── exam-export.ts    #   Excel 导出（xlsx-js-style）
+│       └── exam-pdf.ts       #   PDF 导出（html2canvas + jsPDF）
+├── scripts/
+│   └── test-core-logic.mjs   # 核心逻辑单元测试（node scripts/test-core-logic.mjs）
+├── next.config.ts            # output: "export" 等静态导出配置
+└── package.json
+```
+
+依赖库均通过 npm 引入（构建时打包，运行时不再依赖 CDN）：
+`xlsx-js-style`、`jspdf`、`html2canvas`、`chart.js`。
+
+## 本地开发
+
+```bash
+npm install
+npm run dev        # http://localhost:3000
+npm run build      # 产物输出到 out/（静态导出）
+node scripts/test-core-logic.mjs   # 核心逻辑单元测试
+```
+
+## 部署（Cloudflare Pages）
+
+GitHub 仓库连接到 Cloudflare Pages，**推送到 main 自动重新部署**。
+
+构建设置（Settings → Build & deployments）：
+
+| 配置项 | 值 |
+|--------|-----|
+| Framework preset | Next.js (Static HTML Export) |
+| Build command | `npx next build` |
+| Build output directory | `out` |
+| 环境变量 `NODE_VERSION` | `22` |
+
+## 已知边界
+
+- `!pageSetup`（横向打印）与 `!printOptions`：xlsx-js-style 库目前不将这两个字段写入
+  生成的 xlsx 文件（原单文件版同样如此）。座位表打印文件默认纵向，打印时在
+  Excel/WPS 中选择横向即可（打印对话框会记住该选择）。
+- 座位号展示色块最多渲染 300 个（输入过大座位数时显示总数提示），不影响分配逻辑。
