@@ -21,6 +21,9 @@ interface ResultPanelProps {
 const GREEN_BTN =
   'inline-block rounded bg-[#27ae60] px-5 py-2.5 text-white transition-colors hover:bg-[#219653]';
 
+/** 预览表最多渲染行数（超过时截断并提示下载总表，避免几千行 DOM 卡顿） */
+const MAX_PREVIEW_ROWS = 500;
+
 export default function ResultPanel({
   sys,
   onDownloadTotal,
@@ -85,7 +88,7 @@ export default function ResultPanel({
                 </tr>
               </thead>
               <tbody className="[&>tr:nth-child(even)]:bg-gray-50">
-                {result.assignments.map((a, i) => (
+                {result.assignments.slice(0, MAX_PREVIEW_ROWS).map((a, i) => (
                   <tr key={i}>
                     <td className="border border-gray-300 px-3 py-2.5">{a.name}</td>
                     <td className="border border-gray-300 px-3 py-2.5">{a.classroom}</td>
@@ -96,6 +99,12 @@ export default function ResultPanel({
                 ))}
               </tbody>
             </table>
+            {result.assignments.length > MAX_PREVIEW_ROWS && (
+              <p className="mt-3 rounded-md bg-gray-50 p-3 text-sm text-gray-600">
+                学生人数较多，预览仅显示前 {MAX_PREVIEW_ROWS} 行（共{' '}
+                {result.assignments.length} 行）。完整名单请切换到“下载”标签页下载总表。
+              </p>
+            )}
           </div>
 
           {sys.remainingUnassigned.length > 0 && (

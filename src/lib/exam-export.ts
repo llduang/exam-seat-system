@@ -9,6 +9,7 @@
 
 import type { WorkSheet } from 'xlsx-js-style';
 import { loadXLSX } from './exam-data';
+import { injectPrintSetup, saveBlob } from './xlsx-print';
 import type { Assignment, PendingStudent } from './exam-assign';
 
 /** 导出上下文（点击导出时的实时状态） */
@@ -383,11 +384,28 @@ export async function downloadRoomSheet(ctx: ExportContext, room: number): Promi
   XLSX.writeFile(workbook, `第${room}考场_分配表.xlsx`);
 }
 
-/** 下载座位表打印 */
+/**
+ * 下载座位表打印。
+ * 打印设置（横向 A4 + 水平居中 + 按宽度缩放）由 xlsx-print.ts 注入：
+ * xlsx-js-style 不写出 !pageSetup/!printOptions（Pro 功能），
+ * 生成的文件若不后处理，Excel/WPS 中恒为竖向、靠左打印。
+ */
 export async function downloadSeatPrint(ctx: ExportContext): Promise<void> {
   const XLSX = await loadXLSX();
   const workbook = await buildSeatPrintWorkbook(ctx);
-  XLSX.writeFile(workbook, '座位表打印.xlsx');
+  const raw = XLSX.write(workbook, { bookType: 'xlsx', type: 'array' }) as ArrayBuffer;
+  const patched = injectPrintSetup(new Uint8Array(raw), {
+    orientation: 'landscape',
+    horizontalCentered: true,
+    fitToWidth: 1,
+    fitToHeight: 0,
+    paperSize: 9,
+  });
+  saveBlob(
+    patched,
+    '座位表打印.xlsx',
+    'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+  );
 }
 
 /**

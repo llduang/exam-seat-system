@@ -50,14 +50,19 @@ export async function readFilesAsWorkbooks(files: FileList | File[]): Promise<Lo
           reader.onload = function (e) {
             try {
               const data = new Uint8Array(e.target?.result as ArrayBuffer);
-              loadXLSX().then((XLSX) => {
-                try {
-                  const workbook = XLSX.read(data, { type: 'array' });
-                  resolve({ fileName: file.name, workbook: workbook });
-                } catch (err) {
+              loadXLSX()
+                .then((XLSX) => {
+                  try {
+                    const workbook = XLSX.read(data, { type: 'array' });
+                    resolve({ fileName: file.name, workbook: workbook });
+                  } catch (err) {
+                    reject(new Error('文件 “' + file.name + '” 读取失败: ' + (err as Error).message));
+                  }
+                })
+                .catch((err) => {
+                  // 运行库动态加载失败也必须让外层 promise 落定，否则 UI 永远等待
                   reject(new Error('文件 “' + file.name + '” 读取失败: ' + (err as Error).message));
-                }
-              });
+                });
             } catch (err) {
               reject(new Error('文件 “' + file.name + '” 读取失败: ' + (err as Error).message));
             }

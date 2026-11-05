@@ -6,7 +6,8 @@
  * 继续消化未分配学生，并避免与同班级上一条记录座位号相同。
  */
 
-import { examComposeNumber, type ExamNumberConfig } from './exam-core';
+// 显式 .ts 扩展：Node 原生 type stripping 可直接运行本模块（供 scripts/ 单元测试）
+import { examComposeNumber, type ExamNumberConfig } from './exam-core.ts';
 
 /** 一条分配结果 */
 export interface Assignment {
@@ -115,6 +116,10 @@ export function runAssignment(input: AssignInput): AssignOutput {
   // 若有班级存在未分配学生，继续分配直到考场无剩余座位
   while (seatCounter < totalSeats && Object.values(unassignedStudentsCount).some((count) => count > 0)) {
     for (const className of classNames) {
+      // 修复（原单文件版遗留缺陷）：while 条件只在整轮 for 之间生效，
+      // 最后一轮 for 内 seatCounter 可能越过 totalSeats，导致座位“超卖”、
+      // 生成不存在的考场号（如 10 个考场分出第 11 考场）且未分配队列归零。
+      if (seatCounter >= totalSeats) break;
       if (unassignedStudentsCount[className] > 0) {
         const studentName = classData[className][classCounters[className]];
         classCounters[className]++;

@@ -3,7 +3,7 @@
 考场座位分配系统（纯前端静态应用，数据不出浏览器）。
 
 基于 **Next.js 16 静态导出**（`output: "export"`）+ Tailwind CSS 4，部署在 Cloudflare Pages。
-按 [free-deploy-webapp](https://github.com/) skill 的场景 A（纯前端工具）架构组织：
+按 free-deploy-webapp skill 的场景 A（纯前端工具）架构组织：
 无后端 Functions、无数据库、无鉴权，全部计算在浏览器完成。
 
 ## 功能
@@ -30,17 +30,19 @@
 │   └── lib/                  # 纯逻辑层（可独立测试）
 │       ├── exam-core.ts      #   班级识别 / 考号构成（纯函数，45 个单元测试）
 │       ├── exam-data.ts      #   Excel 读取与班级/学生提取
-│       ├── exam-assign.ts    #   两阶段轮询分配算法
+│       ├── exam-assign.ts    #   两阶段轮询分配算法（20 个单元测试，含座位超卖回归）
 │       ├── exam-export.ts    #   Excel 导出（xlsx-js-style）
-│       └── exam-pdf.ts       #   PDF 导出（html2canvas + jsPDF）
+│       ├── exam-pdf.ts       #   PDF 导出（html2canvas + jsPDF，分页 + 垂直居中版式）
+│       └── xlsx-print.ts     #   xlsx 打印设置注入（fflate，横向/居中/按宽缩放）
 ├── scripts/
-│   └── test-core-logic.mjs   # 核心逻辑单元测试（node scripts/test-core-logic.mjs）
+│   ├── test-core-logic.mjs   # 核心逻辑单元测试（node scripts/test-core-logic.mjs）
+│   └── test-assign-logic.mjs # 分配算法单元测试（node scripts/test-assign-logic.mjs）
 ├── next.config.ts            # output: "export" 等静态导出配置
 └── package.json
 ```
 
 依赖库均通过 npm 引入（构建时打包，运行时不再依赖 CDN）：
-`xlsx-js-style`、`jspdf`、`html2canvas`、`chart.js`。
+`xlsx-js-style`、`jspdf`、`html2canvas`、`chart.js`、`fflate`（用于向导出的 xlsx 注入打印设置）。
 
 ## 本地开发
 
@@ -48,7 +50,8 @@
 npm install
 npm run dev        # http://localhost:3000
 npm run build      # 产物输出到 out/（静态导出）
-node scripts/test-core-logic.mjs   # 核心逻辑单元测试
+node scripts/test-core-logic.mjs    # 核心逻辑单元测试（45 项）
+node scripts/test-assign-logic.mjs  # 分配算法单元测试（20 项）
 ```
 
 ## 部署（Cloudflare Pages）
@@ -66,7 +69,14 @@ GitHub 仓库连接到 Cloudflare Pages，**推送到 main 自动重新部署**�
 
 ## 已知边界
 
-- `!pageSetup`（横向打印）与 `!printOptions`：xlsx-js-style 库目前不将这两个字段写入
-  生成的 xlsx 文件（原单文件版同样如此）。座位表打印文件默认纵向，打印时在
-  Excel/WPS 中选择横向即可（打印对话框会记住该选择）。
 - 座位号展示色块最多渲染 300 个（输入过大座位数时显示总数提示），不影响分配逻辑。
+- 预览表最多渲染 500 行（提示下载总表查看完整名单），不影响分配与导出。
+
+## 打印说明
+
+- **座位表打印.xlsx**：已内置打印设置（A4 横向、水平居中、按宽度缩放到一页宽）。
+  xlsx-js-style 本身不写出 `!pageSetup`/`!printOptions`（Pro 功能），因此导出后由
+  `src/lib/xlsx-print.ts` 用 fflate 解包重写工作表 XML 注入上述节点，Excel/WPS
+  打开即可直接打印，无需手动调整方向。
+- **考场座位表 PDF**：每页一个考场（A4 竖向，内容垂直居中）；人数超过单页容量
+  （约 26 人）的考场自动分页，续页重复表头，序号在考场内连续。
