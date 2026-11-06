@@ -5,6 +5,7 @@ import {
   getUsedSeats,
   getSeatOptionsForRoom,
   planAutoFill,
+  sortByRoomSeat,
 } from '../src/lib/exam-assign.ts';
 
 let passed = 0, failed = 0;
@@ -251,6 +252,90 @@ console.log('== 7. 自动补位 planAutoFill ==');
     assertEq(planAutoFill([], CTN, 10, 40, {}, CFG), [], '7.7 空队列返回空计划');
     assertEq(planAutoFill(q(['甲'], '11班'), CTN, 0, 40, {}, CFG), [], '7.7 考场数 0 返回空计划');
     assertEq(planAutoFill(q(['甲'], '11班'), CTN, 10, 0, {}, CFG), [], '7.7 座位数 0 返回空计划');
+  }
+}
+
+console.log('== 8. sortByRoomSeat 总表排序（补位学生归位） ==');
+{
+  // 8.1 串联场景：自动分配（6 人）+ 自动补位（2 人追加在末尾）→ 排序后按考场座位归位
+  const { classData, classNames, classNameToNumber } = makeClasses({ '1班': 4, '2班': 4 });
+  const out = runAssignment({
+    classData, classNames, classNameToNumber,
+    classroomCount: 2, seatCount: 3, examConfig: CFG,
+  });
+  assertEq(out.assignments.length, 6, '8.1 自动分配 6 人（2 考场 × 3 座）');
+  const used = getUsedSeats(out.assignments, {});
+  const placements = planAutoFill(out.unassignedQueue, classNameToNumber, 2, 3, used, CFG);
+  assertEq(placements.length, 2, '8.1 补位 2 人');
+
+  // 模拟真实流程：补位结果追加到 assignments 末尾（第 1 考场第 4 号、第 2 考场第 4 号）
+  const appended = [...out.assignments];
+  placements.forEach((p) => {
+    appended.push({
+      name: p.student.name, classroom: p.classroom, seat: p.seat,
+      class: p.student.class, examNumber: p.examNumber,
+    });
+  });
+  // 排序前：补位学生在末尾成块
+  const lastTwoBefore = appended.slice(-2).map((a) => [a.classroom, a.seat]);
+  assertEq(lastTwoBefore, [[1, 4], [2, 4]], '8.1 排序前补位学生在末尾');
+
+  const sorted = sortByRoomSeat(appended);
+  assertEq(
+    sorted.map((a) => [a.classroom, a.seat]),
+    [[1, 1], [1, 2], [1, 3], [1, 4], [2, 1], [2, 2], [2, 3], [2, 4]],
+    '8.1 排序后按（考场，座位）归位：补位学生紧跟同考场最后一个座位',
+  );
+  assertEq(appended.length, sorted.length, '8.1 排序不丢数据');
+  assertTrue(
+    JSON.stringify(appended.map((a) => a.name).sort()) ===
+      JSON.stringify(sorted.map((a) => a.name).sort()),
+    '8.1 排序前后名单一致（仅位置变化）',
+  );
+
+  // 8.2 纯函数性：不改原数组
+  const before = JSON.stringify(appended);
+  sortByRoomSeat(appended);
+  assertEq(JSON.stringify(appended), before, '8.2 sortByRoomSeat 不修改原数组');
+
+  // 8.3 用户示例口径：10 考场 40 座、多 2 人（第 9、10 考场 41 号）
+  {
+    const spec = {};
+    for (let c = 1; c <= 16; c++) spec[`${c}班`] = 30;  // 480 人
+    const { classData, classNames, classNameToNumber } = makeClasses(spec);
+    const out = runAssignment({
+      classData, classNames, classNameToNumber,
+      classroomCount: 10, seatCount: 40, examConfig: CFG,
+    });
+    assertEq(out.unassignedQueue.length, 80, '8.3 超员 80 人进入队列（容量场景）');
+    // 只取前 2 人补位（对齐用户示例）
+    const queue2 = out.unassignedQueue.slice(0, 2);
+    const used = getUsedSeats(out.assignments, {});
+    const placements = planAutoFill(queue2, classNameToNumber, 10, 40, used, CFG);
+    const appended = [...out.assignments];
+    placements.forEach((p) => {
+      appended.push({
+        name: p.student.name, classroom: p.classroom, seat: p.seat,
+        class: p.student.class, examNumber: p.examNumber,
+      });
+    });
+    const sorted = sortByRoomSeat(appended);
+    // 第 9、10 考场各 41 人：补位学生是各自考场最后一行
+    const room9 = sorted.filter((a) => a.classroom === 9);
+    const room10 = sorted.filter((a) => a.classroom === 10);
+    assertEq(room9.length, 41, '8.3 第 9 考场 41 人');
+    assertEq(room10.length, 41, '8.3 第 10 考场 41 人');
+    assertEq(room9[40].seat, 41, '8.3 第 9 考场最后一行是 41 号座（补位归位）');
+    assertEq(room10[40].seat, 41, '8.3 第 10 考场最后一行是 41 号座（补位归位）');
+    // 全局有序
+    let inOrder = true;
+    for (let i = 1; i < sorted.length; i++) {
+      const p = sorted[i - 1], c = sorted[i];
+      if (c.classroom < p.classroom || (c.classroom === p.classroom && c.seat <= p.seat)) {
+        inOrder = false; break;
+      }
+    }
+    assertTrue(inOrder, '8.3 整表严格按（考场，座位）升序');
   }
 }
 

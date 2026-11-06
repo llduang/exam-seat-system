@@ -10,7 +10,7 @@
 import type { WorkSheet } from 'xlsx-js-style';
 import { loadXLSX } from './exam-data';
 import { injectPrintSetup, saveBlob } from './xlsx-print';
-import type { Assignment, PendingStudent } from './exam-assign';
+import { sortByRoomSeat, type Assignment, type PendingStudent } from './exam-assign';
 
 /** 导出上下文（点击导出时的实时状态） */
 export interface ExportContext {
@@ -86,21 +86,21 @@ function totalRows(assignments: Assignment[]) {
   }));
 }
 
-/** 构建总表工作表 */
+/** 构建总表工作表（按考场号、座位号排序，补位/手动分配的学生归位到对应位置） */
 async function buildTotalWorksheet(ctx: ExportContext): Promise<WorkSheet> {
   const XLSX = await loadXLSX();
-  const ws = XLSX.utils.json_to_sheet(totalRows(ctx.assignments));
+  const ws = XLSX.utils.json_to_sheet(totalRows(sortByRoomSeat(ctx.assignments)));
   await applyWorksheetStyle(ws, [12, 10, 10, 18, 22]);
   return ws;
 }
 
-/** 构建班级工作表 */
+/** 构建班级工作表（按考场号、座位号排序） */
 async function buildClassWorksheet(
   ctx: ExportContext,
   className: string,
 ): Promise<WorkSheet> {
   const XLSX = await loadXLSX();
-  const rows = ctx.assignments
+  const rows = sortByRoomSeat(ctx.assignments)
     .filter((a) => a.class === className)
     .map((a) => ({
       姓名: a.name,
@@ -114,7 +114,7 @@ async function buildClassWorksheet(
   return ws;
 }
 
-/** 构建考场工作表（带合并标题行，原版 generateExcelFiles 中考场部分） */
+/** 构建考场工作表（带合并标题行，数据按座位号升序；原版 generateExcelFiles 中考场部分） */
 async function buildRoomWorksheet(
   roomNumber: number,
   roomAssignments: Assignment[],
@@ -125,8 +125,8 @@ async function buildRoomWorksheet(
   classroomAoa.push([`第${roomNumber}考场`, '', '', '']);
   // 表头行
   classroomAoa.push(['姓名', '座位号', '班级', '考号']);
-  // 数据行
-  roomAssignments.forEach((a) => {
+  // 数据行（按座位号升序，补位/手动分配的学生归位）
+  sortByRoomSeat(roomAssignments).forEach((a) => {
     classroomAoa.push([a.name, a.seat, a.class, a.examNumber]);
   });
 

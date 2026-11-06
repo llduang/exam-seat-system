@@ -181,6 +181,18 @@ export function runAssignment(input: AssignInput): AssignOutput {
 }
 
 /**
+ * 按（考场号，座位号）升序排序的副本。
+ * 总表/班级表/考场表导出与页面预览统一使用：
+ * 轮询自动分配部分本就按此序生成（稳定排序保持原样），
+ * 补位/手动分配的学生追加在数组末尾，经此排序归位到对应考场座位处。
+ */
+export function sortByRoomSeat(assignments: Assignment[]): Assignment[] {
+  return [...assignments].sort(
+    (a, b) => a.classroom - b.classroom || a.seat - b.seat,
+  );
+}
+
+/**
  * 获取已使用的座位（考场号 → 座位号集合），含手动分配产生的额外座位。
  * 原版 getUsedSeats。
  */

@@ -6,6 +6,7 @@
  */
 
 import type { ExamSystem } from '@/hooks/use-exam-system';
+import { sortByRoomSeat } from '@/lib/exam-assign';
 import ClassStatsChart from './ClassStatsChart';
 
 interface ResultPanelProps {
@@ -35,6 +36,10 @@ export default function ResultPanel({
 }: ResultPanelProps) {
   const result = sys.result;
   if (!result) return null;
+
+  // 预览按（考场号，座位号）排序，与导出的总表一致，
+  // 补位/手动分配的学生归位到对应考场座位处
+  const previewAssignments = sortByRoomSeat(result.assignments);
 
   const tabs: { id: 'preview' | 'download' | 'statistics'; label: string }[] = [
     { id: 'preview', label: '预览' },
@@ -88,7 +93,7 @@ export default function ResultPanel({
                 </tr>
               </thead>
               <tbody className="[&>tr:nth-child(even)]:bg-gray-50">
-                {result.assignments.slice(0, MAX_PREVIEW_ROWS).map((a, i) => (
+                {previewAssignments.slice(0, MAX_PREVIEW_ROWS).map((a, i) => (
                   <tr key={i}>
                     <td className="border border-gray-300 px-3 py-2.5">{a.name}</td>
                     <td className="border border-gray-300 px-3 py-2.5">{a.classroom}</td>
