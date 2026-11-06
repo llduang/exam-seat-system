@@ -13,6 +13,7 @@ import {
   examComposeNumber,
   examNormalizeClassGroups,
   examPreviewInfo,
+  examRecommendSeatsPerRoom,
   type ExamComponent,
   type ExamNumberConfig,
   type ExamPreviewInfo,
@@ -84,8 +85,12 @@ export function useExamSystem() {
   const [columnHeaders, setColumnHeaders] = useState<string[]>([]);
   const [nameColumn, setNameColumn] = useState<number | null>(null);
   const [classColumn, setClassColumn] = useState<number | null>(null);
-  const [classroomCount, setClassroomCount] = useState(18);
-  const [seatCount, setSeatCount] = useState(25);
+  // 默认均为 0（未设置）；座位数在用户未手动修改过时随
+  // （总人数、考场数）自动给出推荐值（总人数 ÷ 考场数，向下取整）
+  const [classroomCount, setClassroomCount] = useState(0);
+  const [seatCount, setSeatCount] = useState(0);
+  /** 每考场座位数是否被用户手动修改过（true 后不再自动推荐） */
+  const [seatCountEdited, setSeatCountEdited] = useState(false);
 
   // ---- 考号构成 ----
   const [components, setComponents] = useState<ExamComponent[]>(DEFAULT_COMPONENTS);
@@ -129,6 +134,31 @@ export function useExamSystem() {
       cancelled = true;
     };
   }, [loadedFiles, format, nameColumn, classColumn]);
+
+  /** 学生总人数（识别成功后可用；用于展示与座位数推荐） */
+  const totalStudents =
+    recognition && recognition.mode === 'ok' ? recognition.totalStudents : 0;
+
+  // ---- 每考场座位数自动推荐 ----
+  // 用户未手动修改过座位数时，随（总人数、考场数）变化自动更新为
+  // 推荐值（总人数 ÷ 考场数，向下取整）；手动修改过则始终尊重用户输入。
+  useEffect(() => {
+    if (seatCountEdited) return;
+    if (classroomCount <= 0 || totalStudents <= 0) return;
+    const recommended = examRecommendSeatsPerRoom(totalStudents, classroomCount);
+    setSeatCount((prev) => (prev === recommended ? prev : recommended));
+  }, [classroomCount, totalStudents, seatCountEdited]);
+
+  /** 用户修改考场数量（座位数未手动改过时会自动重算推荐值） */
+  const changeClassroomCount = useCallback((value: number) => {
+    setClassroomCount(value);
+  }, []);
+
+  /** 用户手动修改每考场座位数（此后不再自动推荐） */
+  const changeSeatCount = useCallback((value: number) => {
+    setSeatCount(value);
+    setSeatCountEdited(true);
+  }, []);
 
   /** 文件选择（支持多文件） */
   const onFilesSelected = useCallback(
@@ -490,9 +520,12 @@ export function useExamSystem() {
     classColumn,
     setClassColumn,
     classroomCount,
-    setClassroomCount,
+    setClassroomCount: changeClassroomCount,
     seatCount,
-    setSeatCount,
+    setSeatCount: changeSeatCount,
+    // 学生总人数与座位数推荐状态
+    totalStudents,
+    seatCountEdited,
     // 考号构成
     components,
     separator,

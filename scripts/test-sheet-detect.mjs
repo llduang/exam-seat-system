@@ -3,6 +3,8 @@
 import {
   detectSheetColumns,
   autoMatchColumns,
+  computeRecognition,
+  loadXLSX,
 } from '../src/lib/exam-data.ts';
 
 let passed = 0, failed = 0;
@@ -129,6 +131,39 @@ console.log('== 8. autoMatchColumns（单表格式预选，宽松模式） ==');
     { nameIndex: -1, classIndex: -1 },
     '无匹配 → 均为 -1',
   );
+}
+
+console.log('== 9. computeRecognition：学生总人数与各班人数（多工作表） ==');
+{
+  const XLSX = await loadXLSX();
+  const wb = XLSX.utils.book_new();
+  // 工作表 1：有“班级”列 → 班级以列内容为准（1班 2 人、2班 1 人）
+  const ws1 = XLSX.utils.aoa_to_sheet([
+    ['姓名', '班级'],
+    ['张三', '1班'],
+    ['李四', '1班'],
+    ['王五', '2班'],
+  ]);
+  XLSX.utils.book_append_sheet(wb, ws1, '名单');
+  // 工作表 2：无班级列 → 班级回退工作表名“5班”（2 人）
+  const ws2 = XLSX.utils.aoa_to_sheet([['姓名'], ['赵六'], ['孙七']]);
+  XLSX.utils.book_append_sheet(wb, ws2, '5班');
+  const r = await computeRecognition(
+    [{ fileName: '名单.xlsx', workbook: wb }],
+    'multi-sheet',
+    { nameColumn: null, classColumn: null },
+  );
+  assertTrue(r !== null, '返回非 null');
+  assertTrue(r.mode === 'ok', '识别成功（mode=ok）');
+  if (r.mode === 'ok') {
+    assertEq(r.totalStudents, 5, '学生总人数 = 5（3+2）');
+    assertEq(r.classSizes, { '1班': 2, '2班': 1, '5班': 2 }, '各班人数：1班 2 人、2班 1 人、5班 2 人');
+    assertTrue(r.title.includes('3 个班级'), '标题含“3 个班级”');
+    assertTrue(r.title.includes('共 5 名学生'), '标题含“共 5 名学生”');
+    assertTrue(r.tags.includes('1班（2人）'), '标签含“1班（2人）”');
+    assertTrue(r.tags.includes('2班（1人）'), '标签含“2班（1人）”');
+    assertTrue(r.tags.includes('5班（2人）'), '标签含“5班（2人）”');
+  }
 }
 
 console.log(`\n结果: ${passed} 通过, ${failed} 失败`);

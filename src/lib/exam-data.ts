@@ -351,10 +351,15 @@ export type RecognitionState =
   | {
       mode: 'ok';
       title: string;
+      /** 班级标签（含各班人数，如“1班（45人）”） */
       tags: string[];
       notes: string[];
       numbers: Record<string, number>;
       normalization: ClassNormalization;
+      /** 各班级（显示名）学生人数 */
+      classSizes: Record<string, number>;
+      /** 学生总人数（识别出的全部学生） */
+      totalStudents: number;
     };
 
 /**
@@ -389,7 +394,20 @@ export async function computeRecognition(
     };
   }
   const norm = examNormalizeClassGroups(extraction.rawClassNames);
-  const tags: string[] = norm.groups.map((g) => g.display);
+  // 各班级（按显示名归并）人数与学生总人数
+  const classSizes: Record<string, number> = {};
+  extraction.rawClassNames.forEach(function (raw) {
+    const display = norm.rawToDisplay[raw];
+    const count = extraction.studentsByRawClass[raw].length;
+    classSizes[display] = (classSizes[display] || 0) + count;
+  });
+  let totalStudents = 0;
+  norm.groups.forEach(function (g) {
+    totalStudents += classSizes[g.display] || 0;
+  });
+  const tags: string[] = norm.groups.map(function (g) {
+    return g.display + '（' + (classSizes[g.display] || 0) + '人）';
+  });
   const notes: string[] = [];
   // 数据读取方式说明（表头自动识别情况）排在最前
   extraction.notes.forEach(function (n) {
@@ -403,11 +421,18 @@ export async function computeRecognition(
   norm.groups.forEach(function (g) { numbers[g.display] = g.classNumber; });
   return {
     mode: 'ok',
-    title: '已识别 ' + norm.groups.length + ' 个班级（已自动统一写法并按班级号排序）：',
+    title:
+      '已识别 ' +
+      norm.groups.length +
+      ' 个班级、共 ' +
+      totalStudents +
+      ' 名学生（已自动统一写法并按班级号排序）：',
     tags: tags,
     notes: notes,
     numbers: numbers,
     normalization: norm,
+    classSizes: classSizes,
+    totalStudents: totalStudents,
   };
 }
 

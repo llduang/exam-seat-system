@@ -284,3 +284,14 @@ export function examPreviewInfo(
   }
   return { text: text, warnings: warnings };
 }
+
+/**
+ * 推荐每个考场座位数：总人数 ÷ 考场数，向下取整（92.1、92.8 均推荐 92）。
+ * 商不足 1 时按 1 计（每个考场至少 1 个座位，否则无法安排任何学生）；
+ * 总人数或考场数无效（≤ 0 / 非有限数）时返回 0，表示暂无推荐值。
+ */
+export function examRecommendSeatsPerRoom(totalStudents: number, roomCount: number): number {
+  if (!Number.isFinite(totalStudents) || !Number.isFinite(roomCount)) return 0;
+  if (totalStudents <= 0 || roomCount <= 0) return 0;
+  return Math.max(1, Math.floor(totalStudents / roomCount));
+}

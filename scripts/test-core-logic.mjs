@@ -5,6 +5,7 @@ import {
   examParseClassToken,
   examNormalizeClassGroups,
   examComposeNumber,
+  examRecommendSeatsPerRoom,
 } from '../src/lib/exam-core.ts';
 
 let passed = 0, failed = 0;
@@ -142,6 +143,23 @@ assertEq(examComposeNumber(width1Comps, '', 12, 3, 4), '1234', '超位数时自�
 // 前缀为空但勾选
 const emptyPrefix = [{ type: 'prefix', enabled: true, value: '', width: 2 }, { type: 'class', enabled: true, value: '', width: 2 }];
 assertEq(examComposeNumber(emptyPrefix, '', 1, 1, 1), '01', '空前缀跳过：仅班级01');
+
+console.log('== 4. 每考场座位数推荐 examRecommendSeatsPerRoom ==');
+{
+  // 向下取整：92.1 / 92.8 均推荐 92
+  assertEq(examRecommendSeatsPerRoom(921, 10), 92, '921人÷10考场 → 92（92.1 向下取整）');
+  assertEq(examRecommendSeatsPerRoom(928, 10), 92, '928人÷10考场 → 92（92.8 向下取整）');
+  assertEq(examRecommendSeatsPerRoom(230, 6), 38, '230人÷6考场 → 38（38.33 向下取整）');
+  assertEq(examRecommendSeatsPerRoom(100, 4), 25, '100人÷4考场 → 25（整除）');
+  assertEq(examRecommendSeatsPerRoom(101, 4), 25, '101人÷4考场 → 25（25.25 向下取整）');
+  // 商不足 1 时按 1 计（每考场至少 1 座）
+  assertEq(examRecommendSeatsPerRoom(5, 10), 1, '5人÷10考场 → 1（商不足 1 按 1 计）');
+  assertEq(examRecommendSeatsPerRoom(1, 1), 1, '1人÷1考场 → 1');
+  // 无效输入 → 0（暂无推荐）
+  assertEq(examRecommendSeatsPerRoom(0, 10), 0, '总人数 0 → 0');
+  assertEq(examRecommendSeatsPerRoom(230, 0), 0, '考场数 0 → 0');
+  assertEq(examRecommendSeatsPerRoom(-5, 3), 0, '负总人数 → 0');
+}
 
 console.log('\n结果: ' + passed + ' 通过, ' + failed + ' 失败');
 process.exit(failed > 0 ? 1 : 0);

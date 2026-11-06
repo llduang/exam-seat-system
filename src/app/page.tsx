@@ -61,6 +61,8 @@ export default function Page() {
         <ExamSettings
           classroomCount={sys.classroomCount}
           seatCount={sys.seatCount}
+          totalStudents={sys.totalStudents}
+          seatCountEdited={sys.seatCountEdited}
           onClassroomCountChange={sys.setClassroomCount}
           onSeatCountChange={sys.setSeatCount}
         />
@@ -76,10 +78,12 @@ export default function Page() {
           preview={sys.preview}
         />
 
-        <div className="mb-5">
-          <label className="mb-2.5 block font-bold text-gray-600">座位号排列顺序：</label>
-          <SeatOrderChips seatCount={sys.seatCount} />
-        </div>
+        {sys.seatCount > 0 && (
+          <div className="mb-5">
+            <label className="mb-2.5 block font-bold text-gray-600">座位号排列顺序：</label>
+            <SeatOrderChips seatCount={sys.seatCount} />
+          </div>
+        )}
 
         <div className="my-8 flex justify-center">
           <button

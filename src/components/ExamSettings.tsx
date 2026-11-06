@@ -1,13 +1,18 @@
 'use client';
 
 /**
- * 考场设置：考场数量 / 每个考场座位数 + 座位号排列顺序展示。
+ * 考场设置：学生总人数 + 考场数量 / 每个考场座位数 + 座位号排列顺序展示。
+ * 座位数在用户未手动修改时按“总人数 ÷ 考场数”向下取整自动推荐（可直接改）。
  * 移植自 .classroom-settings 与 #seatOrderContainer。
  */
 
 interface ExamSettingsProps {
   classroomCount: number;
   seatCount: number;
+  /** 学生总人数（导入名单识别成功后；0 表示尚未识别） */
+  totalStudents: number;
+  /** 每考场座位数是否被用户手动修改过（true 后不再自动推荐） */
+  seatCountEdited: boolean;
   onClassroomCountChange: (value: number) => void;
   onSeatCountChange: (value: number) => void;
 }
@@ -15,11 +20,26 @@ interface ExamSettingsProps {
 export default function ExamSettings({
   classroomCount,
   seatCount,
+  totalStudents,
+  seatCountEdited,
   onClassroomCountChange,
   onSeatCountChange,
 }: ExamSettingsProps) {
+  // 当前座位数为自动推荐值（用户未手动改过，且考场数与总人数均已就绪）
+  const recommendActive =
+    !seatCountEdited && classroomCount > 0 && totalStudents > 0 && seatCount > 0;
   return (
     <div className="mb-5">
+      <div className="mb-3 flex flex-wrap items-center gap-2">
+        <span className="font-bold text-[#2c3e50]">学生总人数：</span>
+        {totalStudents > 0 ? (
+          <span className="inline-block rounded-full bg-blue-100 px-3 py-1 text-sm font-bold text-[#1a5276]">
+            共 {totalStudents} 人
+          </span>
+        ) : (
+          <span className="text-sm text-gray-500">导入名单并识别班级后显示</span>
+        )}
+      </div>
       <div className="flex flex-wrap gap-5">
         <div className="min-w-[200px] flex-1">
           <label htmlFor="classroomCount" className="mb-2 block font-bold text-gray-600">
@@ -28,7 +48,7 @@ export default function ExamSettings({
           <input
             id="classroomCount"
             type="number"
-            min={1}
+            min={0}
             className="w-full rounded-md border border-gray-300 px-3 py-3 text-base"
             value={Number.isFinite(classroomCount) ? classroomCount : ''}
             onChange={(e) => onClassroomCountChange(Math.floor(Number(e.target.value) || 0))}
@@ -41,11 +61,23 @@ export default function ExamSettings({
           <input
             id="seatCount"
             type="number"
-            min={1}
+            min={0}
             className="w-full rounded-md border border-gray-300 px-3 py-3 text-base"
             value={Number.isFinite(seatCount) ? seatCount : ''}
             onChange={(e) => onSeatCountChange(Math.floor(Number(e.target.value) || 0))}
           />
+          {recommendActive ? (
+            <div className="mt-1.5 text-sm leading-snug text-gray-500">
+              已自动推荐：总人数 {totalStudents} ÷ 考场数 {classroomCount}，向下取整为{' '}
+              {seatCount}；如需调整可直接修改
+            </div>
+          ) : (
+            !seatCountEdited && (
+              <div className="mt-1.5 text-sm leading-snug text-gray-500">
+                设置考场数量后，将按“总人数 ÷ 考场数”向下取整自动推荐，也可直接输入
+              </div>
+            )
+          )}
         </div>
       </div>
     </div>
@@ -69,7 +101,7 @@ export function SeatOrderChips({ seatCount }: { seatCount: number }) {
           </div>
         ))}
         {hidden > 0 && (
-          <div className="m-1 inline-flex h-10 items-center justify-center rounded-md px-2 text-sm text-gray-500">
+          <div className="m-1 inline-flex h-10 items-center justify-center px-2 text-sm text-gray-500">
             …共 {Math.floor(seatCount)} 个座位
           </div>
         )}
