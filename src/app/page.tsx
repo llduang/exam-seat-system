@@ -142,8 +142,10 @@ export default function Page() {
           classroomCount={sys.classroomCount}
           seatCount={sys.seatCount}
           seatOptionsForRoom={sys.seatOptionsForRoom}
+          autoFillPreview={sys.autoFillPreview}
           onAssign={sys.assignCurrent}
           onSkip={sys.skipCurrent}
+          onAutoFill={sys.autoFillRemaining}
           onFinish={sys.finishModal}
           onAbort={sys.abortModal}
         />

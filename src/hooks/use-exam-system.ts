@@ -30,6 +30,7 @@ import {
 import {
   getSeatOptionsForRoom,
   getUsedSeats,
+  planAutoFill,
   runAssignment,
   type Assignment,
   type PendingStudent,
@@ -63,6 +64,8 @@ export interface ExamResultState {
   additionalSeats: Record<number, number[]>;
   /** 本次手动分配数 */
   manualAssignedCount: number;
+  /** 本次自动补位数 */
+  autoFilledCount: number;
 }
 
 /** 默认考号构成（与单文件版初始 HTML 一致） */
@@ -275,6 +278,7 @@ export function useExamSystem() {
         skipped: [],
         additionalSeats: {},
         manualAssignedCount: 0,
+        autoFilledCount: 0,
       };
       setResult(nextResult);
 
@@ -357,15 +361,85 @@ export function useExamSystem() {
     });
   }, [result, currentPending]);
 
+  /** 剩余待处理学生（未分配队列中尚未处理的） */
+  const remainingQueue: PendingStudent[] = useMemo(() => {
+    if (!result) return [];
+    return result.unassignedQueue.slice(result.queueIndex);
+  }, [result]);
+
+  /** 自动补位预览：剩余学生将落在哪些考场/座位（不动状态） */
+  const autoFillPreview = useMemo(() => {
+    if (!result || !remainingQueue.length) return [];
+    return planAutoFill(
+      remainingQueue,
+      result.classNameToNumber,
+      classroomCount,
+      seatCount,
+      usedSeats,
+      examConfig,
+    );
+  }, [result, remainingQueue, classroomCount, seatCount, usedSeats, examConfig]);
+
+  /**
+   * 一键自动补位：把剩余待处理学生依次安排到末尾考场的
+   * “第 seatCount+1 号”座位（如 10 考场 40 座：第 1 人 → 第 9 考场 41 号，
+   * 第 2 人 → 第 10 考场 41 号），跳过的学生不参与。
+   */
+  const autoFillRemaining = useCallback(() => {
+    if (!result || !remainingQueue.length) return;
+    const placements = planAutoFill(
+      remainingQueue,
+      result.classNameToNumber,
+      classroomCount,
+      seatCount,
+      usedSeats,
+      examConfig,
+    );
+    if (!placements.length) return;
+
+    const assignments: Assignment[] = [...result.assignments];
+    const additionalSeats: Record<number, number[]> = { ...result.additionalSeats };
+    placements.forEach((p) => {
+      assignments.push({
+        name: p.student.name,
+        classroom: p.classroom,
+        seat: p.seat,
+        class: p.student.class,
+        examNumber: p.examNumber,
+      });
+      // 额外座位（> seatCount）记录到额外座位列表
+      if (p.seat > seatCount) {
+        additionalSeats[p.classroom] = [...(additionalSeats[p.classroom] || []), p.seat];
+      }
+    });
+
+    setResult({
+      ...result,
+      assignments,
+      additionalSeats,
+      queueIndex: result.queueIndex + placements.length,
+      autoFilledCount: result.autoFilledCount + placements.length,
+    });
+    showStatus(
+      `已自动补位 ${placements.length} 人：` +
+        placements
+          .map((p) => `${p.student.name}→考场${p.classroom}第${p.seat}号`)
+          .join('，'),
+      'success',
+    );
+  }, [result, remainingQueue, classroomCount, seatCount, usedSeats, examConfig, showStatus]);
+
   /** 完成处理，展示结果 */
   const finishModal = useCallback(() => {
     if (!result) return;
     setPhase('done');
     setActiveTab('preview');
     const assignedCount = result.manualAssignedCount;
+    const autoCount = result.autoFilledCount;
     const skippedCount = result.skipped.length;
     const remainingCount = result.unassignedQueue.length - result.queueIndex;
-    let message = `未分配学生处理完成！\n已分配：${assignedCount}人`;
+    let message = `未分配学生处理完成！\n已分配：${assignedCount + autoCount}人`;
+    if (autoCount > 0) message += `（含自动补位 ${autoCount}人）`;
     if (skippedCount > 0) message += `\n跳过：${skippedCount}人`;
     if (remainingCount > 0) message += `\n待处理：${remainingCount}人`;
     showStatus(message, 'success');
@@ -445,6 +519,8 @@ export function useExamSystem() {
     seatOptionsForRoom,
     assignCurrent,
     skipCurrent,
+    autoFillRemaining,
+    autoFillPreview,
     finishModal,
     abortModal,
     // 派生

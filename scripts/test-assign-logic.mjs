@@ -4,6 +4,7 @@ import {
   runAssignment,
   getUsedSeats,
   getSeatOptionsForRoom,
+  planAutoFill,
 } from '../src/lib/exam-assign.ts';
 
 let passed = 0, failed = 0;
@@ -141,6 +142,116 @@ console.log('== 6. getUsedSeats / getSeatOptionsForRoom ==');
   const full = getSeatOptionsForRoom(1, 5, { 1: new Set([1, 2, 3, 4, 5]) });
   assertEq(full.seats, [6, 7, 8, 9, 10], '考场满员时提供 5 个额外座位');
   assertEq(full.extraFrom, 6, '额外座位从 seatCount+1 开始');
+
+  // 回归：满员 + 部分额外座位已被手动占用 → 选项要跳过已占用的座位号
+  const fullWithExtra = getSeatOptionsForRoom(1, 5, { 1: new Set([1, 2, 3, 4, 5, 6, 7]) });
+  assertEq(fullWithExtra.seats, [8, 9, 10, 11, 12], '额外座位选项跳过已手动占用的 6、7 号');
+  assertEq(fullWithExtra.extraFrom, 6, 'extraFrom 仍标记第一个额外座位号');
+}
+
+console.log('== 7. 自动补位 planAutoFill ==');
+{
+  const CTN = { '11班': 11, '12班': 12 };
+  const q = (names, cls) => names.map((n) => ({ name: n, class: cls }));
+
+  // 7.1 用户示例：多 2 人、10 考场、每场 40 座 → 第 9 考场 41 号、第 10 考场 41 号
+  {
+    const p = planAutoFill(q(['甲', '乙'], '11班'), CTN, 10, 40, {}, CFG);
+    assertEq(p.length, 2, '7.1 两人都得到落位');
+    assertEq([p[0].classroom, p[0].seat], [9, 41], '7.1 第 1 人 → 第 9 考场 41 号');
+    assertEq([p[1].classroom, p[1].seat], [10, 41], '7.1 第 2 人 → 第 10 考场 41 号');
+    assertEq(p[0].examNumber, '806110941', '7.1 考号 = 前缀806+班级11+考场09+座位41');
+  }
+
+  // 7.2 多 3 人 → 第 8、9、10 考场（末尾 3 个考场，升序）
+  {
+    const p = planAutoFill(q(['甲', '乙', '丙'], '11班'), CTN, 10, 40, {}, CFG);
+    assertEq(
+      p.map((x) => [x.classroom, x.seat]),
+      [[8, 41], [9, 41], [10, 41]],
+      '7.2 三人 → 第 8、9、10 考场 41 号',
+    );
+  }
+
+  // 7.3 多 1 人 → 第 10 考场 41 号
+  {
+    const p = planAutoFill(q(['甲'], '11班'), CTN, 10, 40, {}, CFG);
+    assertEq([p[0].classroom, p[0].seat], [10, 41], '7.3 一人 → 第 10 考场 41 号');
+  }
+
+  // 7.4 跳过已被占用的座位：第 9 考场 41 号已被手动占用 → 用第 8、10 考场
+  {
+    const used = { 9: new Set([41]) };
+    const p = planAutoFill(q(['甲', '乙'], '11班'), CTN, 10, 40, used, CFG);
+    assertEq(
+      p.map((x) => [x.classroom, x.seat]),
+      [[8, 41], [10, 41]],
+      '7.4 第 9 考场 41 号被占 → 第 8、10 考场 41 号',
+    );
+  }
+
+  // 7.5 多出人数 > 考场数：先铺满 41 号层（全部考场），再到 42 号层（末尾考场）
+  {
+    const names = Array.from({ length: 12 }, (_, i) => `学生${i + 1}`);
+    const p = planAutoFill(q(names, '11班'), CTN, 10, 40, {}, CFG);
+    assertEq(p.length, 12, '7.5 十二人都得到落位');
+    const layer1 = p.filter((x) => x.seat === 41);
+    const layer2 = p.filter((x) => x.seat === 42);
+    assertEq(layer1.length, 10, '7.5 第一层（41 号）铺满 10 个考场');
+    assertEq(
+      layer1.map((x) => x.classroom),
+      [1, 2, 3, 4, 5, 6, 7, 8, 9, 10],
+      '7.5 第一层覆盖全部考场（升序）',
+    );
+    assertEq(
+      layer2.map((x) => [x.classroom, x.seat]),
+      [[9, 42], [10, 42]],
+      '7.5 第二层 → 第 9、10 考场 42 号',
+    );
+    // 全局唯一性：考场-座位不重复
+    const seen = new Set();
+    let clash = false;
+    p.forEach((x) => {
+      const k = `${x.classroom}-${x.seat}`;
+      if (seen.has(k)) clash = true;
+      seen.add(k);
+    });
+    assertTrue(!clash, '7.5 自动补位不产生重复座位');
+  }
+
+  // 7.6 与分配算法串联：超员场景的未分配队列可直接自动补位
+  {
+    // 16 班共 455 人、10 考场 × 45 座 = 450 座 → 5 人未分配
+    const spec = {};
+    for (let c = 1; c <= 15; c++) spec[`${c}班`] = 30;
+    spec['16班'] = 5;
+    const { classData, classNames, classNameToNumber } = makeClasses(spec);
+    const out = runAssignment({
+      classData, classNames, classNameToNumber,
+      classroomCount: 10, seatCount: 45, examConfig: CFG,
+    });
+    const used = getUsedSeats(out.assignments, {});
+    const p = planAutoFill(out.unassignedQueue, classNameToNumber, 10, 45, used, CFG);
+    assertEq(p.length, 5, '7.6 五名未分配学生全部落位');
+    assertEq(
+      p.map((x) => [x.classroom, x.seat]),
+      [[6, 46], [7, 46], [8, 46], [9, 46], [10, 46]],
+      '7.6 → 第 6-10 考场 46 号座（末尾 5 个考场升序）',
+    );
+    // 落位后与已有分配不冲突
+    let clash = false;
+    p.forEach((x) => {
+      if (used[x.classroom] && used[x.classroom].has(x.seat)) clash = true;
+    });
+    assertTrue(!clash, '7.6 补位座位与已有分配不冲突');
+  }
+
+  // 7.7 边界：空队列 / 非法参数
+  {
+    assertEq(planAutoFill([], CTN, 10, 40, {}, CFG), [], '7.7 空队列返回空计划');
+    assertEq(planAutoFill(q(['甲'], '11班'), CTN, 0, 40, {}, CFG), [], '7.7 考场数 0 返回空计划');
+    assertEq(planAutoFill(q(['甲'], '11班'), CTN, 10, 0, {}, CFG), [], '7.7 座位数 0 返回空计划');
+  }
 }
 
 console.log(`\n结果: ${passed} 通过, ${failed} 失败`);

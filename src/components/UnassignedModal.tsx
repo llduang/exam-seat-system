@@ -2,11 +2,12 @@
 
 /**
  * 未分配学生处理模态框：逐个为学生选择考场/座位（排除已占用，
- * 无空位时提供额外座位），或跳过。移植自 #unassignedModal 及其事件逻辑。
+ * 无空位时提供额外座位）或跳过；也支持一键自动补位
+ * （把剩余学生依次安排到末尾考场的第 seatCount+1 号座位）。
  */
 
 import { useEffect, useState } from 'react';
-import type { PendingStudent } from '@/lib/exam-assign';
+import type { AutoFillPlacement, PendingStudent } from '@/lib/exam-assign';
 
 interface UnassignedModalProps {
   /** 待处理队列 */
@@ -19,8 +20,12 @@ interface UnassignedModalProps {
   seatCount: number;
   /** 指定考场的可选座位 */
   seatOptionsForRoom: (room: number) => { seats: number[]; extraFrom: number | null };
+  /** 自动补位预览（剩余学生将落在哪些考场/座位） */
+  autoFillPreview: AutoFillPlacement[];
   onAssign: (room: number, seat: number) => void;
   onSkip: () => void;
+  /** 一键自动补位：把剩余学生安排到末尾考场的第 seatCount+1 号座位 */
+  onAutoFill: () => void;
   onFinish: () => void;
   onAbort: () => void;
 }
@@ -32,8 +37,10 @@ export default function UnassignedModal({
   classroomCount,
   seatCount,
   seatOptionsForRoom,
+  autoFillPreview,
   onAssign,
   onSkip,
+  onAutoFill,
   onFinish,
   onAbort,
 }: UnassignedModalProps) {
@@ -132,6 +139,39 @@ export default function UnassignedModal({
             </div>
           )}
         </div>
+
+        {/* 一键自动补位 */}
+        {autoFillPreview.length > 0 && (
+          <div className="mb-2 rounded-lg border border-[#b8daff] bg-[#eaf4ff] p-4">
+            <div className="mb-2 text-base font-bold text-[#2c3e50]">
+              自动补位（剩余 {autoFillPreview.length} 人）
+            </div>
+            <p className="mb-3 text-sm leading-6 text-gray-600">
+              把剩余学生依次安排到末尾考场的
+              <span className="font-bold text-[#2c3e50]">第 {seatCount + 1} 号座位</span>
+              （如 10 个考场、每场 {seatCount} 人，多出 2 人则：第 1 人 → 第{' '}
+              {classroomCount - 1} 考场第 {seatCount + 1} 号，第 2 人 → 第 {classroomCount}{' '}
+              考场第 {seatCount + 1} 号），无需逐个手动分配。
+            </p>
+            <div className="mb-3 flex max-h-40 flex-wrap gap-2 overflow-y-auto">
+              {autoFillPreview.map((p) => (
+                <span
+                  key={p.student.name + '-' + p.classroom + '-' + p.seat}
+                  className="rounded-full border border-[#9ec5fe] bg-white px-3 py-1 text-xs text-[#2c3e50]"
+                >
+                  {p.student.name}（{p.student.class}）→ 考场{p.classroom} 第{p.seat}号
+                </span>
+              ))}
+            </div>
+            <button
+              type="button"
+              onClick={onAutoFill}
+              className="rounded bg-[#007bff] px-5 py-2.5 text-base font-bold text-white hover:bg-[#0069d9]"
+            >
+              一键自动补位（{autoFillPreview.length} 人）
+            </button>
+          </div>
+        )}
 
         <div className="mt-5 flex items-center justify-between border-t border-gray-200 pt-4">
           <div className="text-sm text-gray-500">
