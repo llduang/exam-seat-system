@@ -32,11 +32,12 @@
 │       ├── exam-data.ts      #   Excel 读取与班级/学生提取
 │       ├── exam-assign.ts    #   两阶段轮询分配算法（20 个单元测试，含座位超卖回归）
 │       ├── exam-export.ts    #   Excel 导出（xlsx-js-style）
-│       ├── exam-pdf.ts       #   PDF 导出（html2canvas + jsPDF，分页 + 垂直居中版式）
+│       ├── exam-pdf.ts       #   PDF 导出（html2canvas scale3 ≈288DPI + jsPDF，均衡分页 + 行高自适应）+ 分页纯函数（37 个单元测试）
 │       └── xlsx-print.ts     #   xlsx 打印设置注入（fflate，横向/居中/按宽缩放）
 ├── scripts/
 │   ├── test-core-logic.mjs   # 核心逻辑单元测试（node scripts/test-core-logic.mjs）
-│   └── test-assign-logic.mjs # 分配算法单元测试（node scripts/test-assign-logic.mjs）
+│   ├── test-assign-logic.mjs # 分配算法单元测试（node scripts/test-assign-logic.mjs）
+│   └── test-seat-pages.mjs   # 座位表分页测试（node scripts/test-seat-pages.mjs）
 ├── next.config.ts            # output: "export" 等静态导出配置
 └── package.json
 ```
@@ -52,6 +53,7 @@ npm run dev        # http://localhost:3000
 npm run build      # 产物输出到 out/（静态导出）
 node scripts/test-core-logic.mjs    # 核心逻辑单元测试（45 项）
 node scripts/test-assign-logic.mjs  # 分配算法单元测试（20 项）
+node scripts/test-seat-pages.mjs    # 座位表分页测试（37 项）
 ```
 
 ## 部署（Cloudflare Pages）
@@ -78,5 +80,10 @@ GitHub 仓库连接到 Cloudflare Pages，**推送到 main 自动重新部署**�
   xlsx-js-style 本身不写出 `!pageSetup`/`!printOptions`（Pro 功能），因此导出后由
   `src/lib/xlsx-print.ts` 用 fflate 解包重写工作表 XML 注入上述节点，Excel/WPS
   打开即可直接打印，无需手动调整方向。
-- **考场座位表 PDF**：每页一个考场（A4 竖向，内容垂直居中）；人数超过单页容量
-  （约 26 人）的考场自动分页，续页重复表头，序号在考场内连续。
+- **考场座位表 PDF**：每页一个考场（A4 竖向，页顶对齐文档式排版），
+  288 DPI 高清渲染（位图无损 PNG 优先）；分页与版式均为智能适配：
+  - 超过单页容量（约 26 人）的考场**均衡分页**（30 人 → 15+15，而非 26+4），
+    续页重复表头、座位号连续；
+  - 短页（人数少）行高自适应拉高 + 弹性备注框（监考教师/考试日期/备注）
+    自动填充剩余空间，不再出现“几行数据、半页空白”；
+  - 版式经三轮 VLM 视觉评审迭代，对标专业扫描 App 的表格文档观感。
