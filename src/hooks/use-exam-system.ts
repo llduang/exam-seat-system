@@ -139,15 +139,21 @@ export function useExamSystem() {
   const totalStudents =
     recognition && recognition.mode === 'ok' ? recognition.totalStudents : 0;
 
+  /** 当前（总人数、考场数）下的推荐每考场座位数（总人数 ÷ 考场数，向下取整；输入无效时为 0） */
+  const recommendedSeats = useMemo(
+    () => examRecommendSeatsPerRoom(totalStudents, classroomCount),
+    [totalStudents, classroomCount],
+  );
+
   // ---- 每考场座位数自动推荐 ----
   // 用户未手动修改过座位数时，随（总人数、考场数）变化自动更新为
-  // 推荐值（总人数 ÷ 考场数，向下取整）；手动修改过则始终尊重用户输入。
+  // 推荐值（总人数 ÷ 考场数，向下取整）；手动修改过则始终尊重用户输入，
+  // 直到点击“恢复推荐值”重新进入自动模式。
   useEffect(() => {
     if (seatCountEdited) return;
-    if (classroomCount <= 0 || totalStudents <= 0) return;
-    const recommended = examRecommendSeatsPerRoom(totalStudents, classroomCount);
-    setSeatCount((prev) => (prev === recommended ? prev : recommended));
-  }, [classroomCount, totalStudents, seatCountEdited]);
+    if (recommendedSeats <= 0) return;
+    setSeatCount((prev) => (prev === recommendedSeats ? prev : recommendedSeats));
+  }, [recommendedSeats, seatCountEdited]);
 
   /** 用户修改考场数量（座位数未手动改过时会自动重算推荐值） */
   const changeClassroomCount = useCallback((value: number) => {
@@ -159,6 +165,19 @@ export function useExamSystem() {
     setSeatCount(value);
     setSeatCountEdited(true);
   }, []);
+
+  /**
+   * 一键恢复推荐值：清除“已手动修改”标记并立即填回当前推荐值，
+   * 此后（总人数、考场数）再变化时重新自动跟随；
+   * 输入暂无效（未识别名单/未设考场数）时仅清除标记，
+   * 座位数值不动，待输入就绪后由推荐 effect 自动填充。
+   */
+  const resetSeatCountToRecommended = useCallback(() => {
+    setSeatCountEdited(false);
+    if (recommendedSeats > 0) {
+      setSeatCount((prev) => (prev === recommendedSeats ? prev : recommendedSeats));
+    }
+  }, [recommendedSeats]);
 
   /** 文件选择（支持多文件） */
   const onFilesSelected = useCallback(
@@ -526,6 +545,10 @@ export function useExamSystem() {
     // 学生总人数与座位数推荐状态
     totalStudents,
     seatCountEdited,
+    /** 当前推荐每考场座位数（0 表示暂无有效推荐） */
+    recommendedSeats,
+    /** 一键恢复推荐值（重新进入自动推荐模式） */
+    resetSeatCountToRecommended,
     // 考号构成
     components,
     separator,

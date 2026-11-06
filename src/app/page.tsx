@@ -63,8 +63,10 @@ export default function Page() {
           seatCount={sys.seatCount}
           totalStudents={sys.totalStudents}
           seatCountEdited={sys.seatCountEdited}
+          recommendedSeats={sys.recommendedSeats}
           onClassroomCountChange={sys.setClassroomCount}
           onSeatCountChange={sys.setSeatCount}
+          onResetSeatCount={sys.resetSeatCountToRecommended}
         />
 
         <ExamNumberConfigPanel

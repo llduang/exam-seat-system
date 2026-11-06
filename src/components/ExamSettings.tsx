@@ -13,8 +13,12 @@ interface ExamSettingsProps {
   totalStudents: number;
   /** 每考场座位数是否被用户手动修改过（true 后不再自动推荐） */
   seatCountEdited: boolean;
+  /** 当前推荐每考场座位数（0 表示暂无有效推荐） */
+  recommendedSeats: number;
   onClassroomCountChange: (value: number) => void;
   onSeatCountChange: (value: number) => void;
+  /** 一键恢复推荐值（重新进入自动推荐模式） */
+  onResetSeatCount: () => void;
 }
 
 export default function ExamSettings({
@@ -22,8 +26,10 @@ export default function ExamSettings({
   seatCount,
   totalStudents,
   seatCountEdited,
+  recommendedSeats,
   onClassroomCountChange,
   onSeatCountChange,
+  onResetSeatCount,
 }: ExamSettingsProps) {
   // 当前座位数为自动推荐值（用户未手动改过，且考场数与总人数均已就绪）
   const recommendActive =
@@ -66,17 +72,26 @@ export default function ExamSettings({
             value={Number.isFinite(seatCount) ? seatCount : ''}
             onChange={(e) => onSeatCountChange(Math.floor(Number(e.target.value) || 0))}
           />
-          {recommendActive ? (
+          {seatCountEdited ? (
+            <div className="mt-1.5 flex flex-wrap items-center gap-x-2 gap-y-1">
+              <button
+                type="button"
+                onClick={onResetSeatCount}
+                className="rounded-md border border-[#3498db] bg-white px-2.5 py-1 text-sm font-medium text-[#2980b9] transition-colors hover:bg-blue-50"
+              >
+                恢复推荐值{recommendedSeats > 0 ? `（${recommendedSeats}）` : ''}
+              </button>
+              <span className="text-sm text-gray-500">已手动修改；恢复后重新跟随自动推荐</span>
+            </div>
+          ) : recommendActive ? (
             <div className="mt-1.5 text-sm leading-snug text-gray-500">
               已自动推荐：总人数 {totalStudents} ÷ 考场数 {classroomCount}，向下取整为{' '}
               {seatCount}；如需调整可直接修改
             </div>
           ) : (
-            !seatCountEdited && (
-              <div className="mt-1.5 text-sm leading-snug text-gray-500">
-                设置考场数量后，将按“总人数 ÷ 考场数”向下取整自动推荐，也可直接输入
-              </div>
-            )
+            <div className="mt-1.5 text-sm leading-snug text-gray-500">
+              设置考场数量后，将按“总人数 ÷ 考场数”向下取整自动推荐，也可直接输入
+            </div>
           )}
         </div>
       </div>
