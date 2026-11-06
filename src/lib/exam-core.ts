@@ -295,3 +295,31 @@ export function examRecommendSeatsPerRoom(totalStudents: number, roomCount: numb
   if (totalStudents <= 0 || roomCount <= 0) return 0;
   return Math.max(1, Math.floor(totalStudents / roomCount));
 }
+
+/** 考场容量检查结果 */
+export interface ExamCapacityInfo {
+  /** 总座位数（考场数 × 每考场座位数；任一输入无效时为 0） */
+  totalSeats: number;
+  /** 坐不下的学生数（总人数 − 总座位数，>0 表示座位不足） */
+  overflow: number;
+  /** 座位是否足以容纳全部学生 */
+  sufficient: boolean;
+}
+
+/**
+ * 考场容量预检：总座位数与超出人数，用于生成前提示。
+ * 任一输入无效（≤ 0 / 非有限数）时 totalSeats=0、overflow=总人数（截为 ≥0）。
+ */
+export function examCapacityInfo(
+  totalStudents: number,
+  roomCount: number,
+  seatCount: number,
+): ExamCapacityInfo {
+  const seats =
+    Number.isFinite(roomCount) && Number.isFinite(seatCount) && roomCount > 0 && seatCount > 0
+      ? Math.floor(roomCount) * Math.floor(seatCount)
+      : 0;
+  const people = Number.isFinite(totalStudents) && totalStudents > 0 ? Math.floor(totalStudents) : 0;
+  const overflow = Math.max(0, people - seats);
+  return { totalSeats: seats, overflow: overflow, sufficient: seats > 0 && overflow === 0 };
+}

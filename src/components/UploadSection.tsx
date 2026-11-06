@@ -1,10 +1,11 @@
 'use client';
 
 /**
- * 上传区：文件选择 + 三种 Excel 格式选择 + 单工作表格式的列映射。
+ * 上传区：文件选择（点击 + 拖拽）+ 三种 Excel 格式选择 + 单工作表格式的列映射。
  * 移植自单文件版的文件输入、.format-selector 与 #columnMapping。
  */
 
+import { useState } from 'react';
 import type { ExcelFormat } from '@/lib/exam-data';
 
 const FORMAT_OPTIONS: { id: ExcelFormat; title: string; desc: string }[] = [
@@ -46,9 +47,38 @@ export default function UploadSection({
   onClassColumnChange,
   onFilesSelected,
 }: UploadSectionProps) {
+  const [dragActive, setDragActive] = useState(false);
   return (
     <div className="mb-5">
-      <div className="mb-5">
+      <div
+        className={
+          'rounded-lg border-2 border-dashed p-4 transition-colors ' +
+          (dragActive
+            ? 'border-[#3498db] bg-blue-50'
+            : 'border-gray-300 bg-gray-50/60 hover:border-gray-400')
+        }
+        onDragEnter={(e) => {
+          e.preventDefault();
+          setDragActive(true);
+        }}
+        onDragOver={(e) => {
+          e.preventDefault();
+          setDragActive(true);
+        }}
+        onDragLeave={(e) => {
+          e.preventDefault();
+          // 移出整个拖拽区才取消高亮（在区内子元素间移动不闪烁）
+          if (!e.currentTarget.contains(e.relatedTarget as Node | null)) {
+            setDragActive(false);
+          }
+        }}
+        onDrop={(e) => {
+          e.preventDefault();
+          setDragActive(false);
+          const files = e.dataTransfer?.files;
+          if (files && files.length) onFilesSelected(files);
+        }}
+      >
         <label htmlFor="excelFile" className="mb-2 block font-bold text-gray-600">
           上传学生名单Excel文件（可同时选择多个文件）：
         </label>
@@ -63,6 +93,13 @@ export default function UploadSection({
             e.target.value = '';
           }}
         />
+        <div className="mt-2.5 text-center text-sm text-gray-500">
+          {dragActive ? (
+            <span className="font-medium text-[#2980b9]">松开鼠标即可上传</span>
+          ) : (
+            '也可以把 .xlsx / .xls 文件直接拖到这个区域'
+          )}
+        </div>
       </div>
 
       <div>

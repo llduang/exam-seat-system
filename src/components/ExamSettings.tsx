@@ -1,10 +1,12 @@
 'use client';
 
 /**
- * 考场设置：学生总人数 + 考场数量 / 每个考场座位数 + 座位号排列顺序展示。
- * 座位数在用户未手动修改时按“总人数 ÷ 考场数”向下取整自动推荐（可直接改）。
+ * 考场设置：学生总人数 + 考场数量 / 每个考场座位数 + 容量预检 + 座位号排列顺序展示。
+ * 座位数在用户未手动修改时按“总人数 ÷ 考场数”向下取整自动推荐（可直接改，可一键恢复）。
  * 移植自 .classroom-settings 与 #seatOrderContainer。
  */
+
+import { examCapacityInfo } from '@/lib/exam-core';
 
 interface ExamSettingsProps {
   classroomCount: number;
@@ -34,6 +36,9 @@ export default function ExamSettings({
   // 当前座位数为自动推荐值（用户未手动改过，且考场数与总人数均已就绪）
   const recommendActive =
     !seatCountEdited && classroomCount > 0 && totalStudents > 0 && seatCount > 0;
+  // 容量预检（考场数与座位数均已设置且已识别名单时展示）
+  const capacity = examCapacityInfo(totalStudents, classroomCount, seatCount);
+  const showCapacity = classroomCount > 0 && seatCount > 0 && totalStudents > 0;
   return (
     <div className="mb-5">
       <div className="mb-3 flex flex-wrap items-center gap-2">
@@ -95,6 +100,19 @@ export default function ExamSettings({
           )}
         </div>
       </div>
+      {showCapacity &&
+        (capacity.sufficient ? (
+          <div className="mt-3 rounded-md border border-green-200 bg-green-50 px-3 py-2 text-sm leading-relaxed text-green-700">
+            ✓ 座位充足：{classroomCount} 考场 × {seatCount} 座 = {capacity.totalSeats} 个座位 ≥
+            {totalStudents} 人
+          </div>
+        ) : (
+          <div className="mt-3 rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-sm leading-relaxed text-amber-800">
+            ⚠ 座位不足：{classroomCount} 考场 × {seatCount} 座 = {capacity.totalSeats} 个座位，
+            少于学生 {totalStudents} 人。多出的 {capacity.overflow} 人生成后将进入
+            “未分配学生处理”，可逐个安排或一键补位（排在各考场末尾加座）。
+          </div>
+        ))}
     </div>
   );
 }

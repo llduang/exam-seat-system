@@ -6,6 +6,7 @@ import {
   examNormalizeClassGroups,
   examComposeNumber,
   examRecommendSeatsPerRoom,
+  examCapacityInfo,
 } from '../src/lib/exam-core.ts';
 
 let passed = 0, failed = 0;
@@ -159,6 +160,48 @@ console.log('== 4. 每考场座位数推荐 examRecommendSeatsPerRoom ==');
   assertEq(examRecommendSeatsPerRoom(0, 10), 0, '总人数 0 → 0');
   assertEq(examRecommendSeatsPerRoom(230, 0), 0, '考场数 0 → 0');
   assertEq(examRecommendSeatsPerRoom(-5, 3), 0, '负总人数 → 0');
+}
+
+console.log('== 5. 考场容量预检 examCapacityInfo ==');
+{
+  // 充足
+  assertEq(
+    examCapacityInfo(92, 10, 10),
+    { totalSeats: 100, overflow: 0, sufficient: true },
+    '10考场×10座=100 ≥ 92 → 充足',
+  );
+  assertEq(
+    examCapacityInfo(100, 4, 25),
+    { totalSeats: 100, overflow: 0, sufficient: true },
+    '恰好相等 → 充足',
+  );
+  // 不足（推荐值向下取整的典型场景）
+  assertEq(
+    examCapacityInfo(92, 10, 9),
+    { totalSeats: 90, overflow: 2, sufficient: false },
+    '10考场×9座=90 < 92 → 2 人超出',
+  );
+  assertEq(
+    examCapacityInfo(230, 6, 38),
+    { totalSeats: 228, overflow: 2, sufficient: false },
+    '6考场×38座=228 < 230 → 2 人超出',
+  );
+  // 无效输入
+  assertEq(
+    examCapacityInfo(92, 0, 10),
+    { totalSeats: 0, overflow: 92, sufficient: false },
+    '考场数 0 → 无座位',
+  );
+  assertEq(
+    examCapacityInfo(92, 10, 0),
+    { totalSeats: 0, overflow: 92, sufficient: false },
+    '座位数 0 → 无座位',
+  );
+  assertEq(
+    examCapacityInfo(0, 10, 10),
+    { totalSeats: 100, overflow: 0, sufficient: true },
+    '总人数 0（未识别）→ 视为充足不提示',
+  );
 }
 
 console.log('\n结果: ' + passed + ' 通过, ' + failed + ' 失败');

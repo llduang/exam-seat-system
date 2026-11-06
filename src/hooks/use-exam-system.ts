@@ -77,6 +77,51 @@ const DEFAULT_COMPONENTS: ExamComponent[] = [
   { type: 'seat', enabled: true, value: '', width: 2 },
 ];
 
+/** 设置持久化 localStorage 键（版本号升级后旧数据自动作废） */
+const SETTINGS_KEY = 'exam-seat-settings-v1';
+
+/** 持久化的设置项（不含识别/结果等会话数据） */
+interface PersistedSettings {
+  format: ExcelFormat;
+  components: ExamComponent[];
+  separator: string;
+  classroomCount: number;
+  seatCount: number;
+  seatCountEdited: boolean;
+}
+
+/** 读取持久化设置（损坏/不存在/隐私模式时返回 null） */
+function loadPersistedSettings(): Partial<PersistedSettings> | null {
+  try {
+    const raw = localStorage.getItem(SETTINGS_KEY);
+    if (!raw) return null;
+    const data: unknown = JSON.parse(raw);
+    if (!data || typeof data !== 'object' || Array.isArray(data)) return null;
+    return data as Partial<PersistedSettings>;
+  } catch {
+    return null;
+  }
+}
+
+/** 校验考号构成数组结构完整（逐项类型/字段检查，防脏数据） */
+function isValidComponents(list: unknown): list is ExamComponent[] {
+  if (!Array.isArray(list) || !list.length) return false;
+  const types = ['prefix', 'class', 'room', 'seat'];
+  return list.every(
+    (c) =>
+      c !== null &&
+      typeof c === 'object' &&
+      typeof (c as ExamComponent).type === 'string' &&
+      types.includes((c as ExamComponent).type) &&
+      typeof (c as ExamComponent).enabled === 'boolean' &&
+      ((c as ExamComponent).type === 'prefix'
+        ? typeof (c as ExamComponent).value === 'string'
+        : Number.isFinite((c as ExamComponent).width) &&
+          (c as ExamComponent).width >= 1 &&
+          (c as ExamComponent).width <= 8),
+  );
+}
+
 /** 主 Hook：返回页面所需的全部状态与动作 */
 export function useExamSystem() {
   // ---- 基础设置 ----
@@ -119,6 +164,46 @@ export function useExamSystem() {
       if (statusTimer.current) clearTimeout(statusTimer.current);
     };
   }, []);
+
+  // ---- 恢复上次设置（挂载后执行，避免 SSR/预渲染水合不一致） ----
+  // 只恢复设置项；识别/结果等会话数据不恢复。
+  useEffect(() => {
+    const s = loadPersistedSettings();
+    if (!s) return;
+    if (s.format === 'multi-sheet' || s.format === 'single-sheet' || s.format === 'multi-file') {
+      setFormat(s.format);
+    }
+    if (isValidComponents(s.components)) {
+      setComponents(s.components);
+    }
+    if (typeof s.separator === 'string') {
+      setSeparator(s.separator);
+    }
+    if (typeof s.classroomCount === 'number' && Number.isFinite(s.classroomCount) && s.classroomCount >= 0) {
+      setClassroomCount(Math.floor(s.classroomCount));
+    }
+    if (typeof s.seatCount === 'number' && Number.isFinite(s.seatCount) && s.seatCount >= 0) {
+      setSeatCount(Math.floor(s.seatCount));
+    }
+    setSeatCountEdited(Boolean(s.seatCountEdited));
+  }, []);
+
+  // ---- 设置持久化（任一设置变化即写入） ----
+  useEffect(() => {
+    try {
+      const payload: PersistedSettings = {
+        format,
+        components,
+        separator,
+        classroomCount,
+        seatCount,
+        seatCountEdited,
+      };
+      localStorage.setItem(SETTINGS_KEY, JSON.stringify(payload));
+    } catch {
+      // 隐私模式/存储已满等写入失败时静默忽略（不影响主流程）
+    }
+  }, [format, components, separator, classroomCount, seatCount, seatCountEdited]);
 
   // ---- 班级识别（上传/切格式/改列后自动重算） ----
   useEffect(() => {
@@ -254,6 +339,42 @@ export function useExamSystem() {
     () => examPreviewInfo(examConfig, classroomCount, seatCount, previewNumbers),
     [examConfig, classroomCount, seatCount, previewNumbers],
   );
+
+  // ---- 生成前置检查：未满足项（空数组 = 可生成） ----
+  // 与 generate() 内部校验对应，但提前暴露给 UI（按钮禁用 + 待办清单）。
+  const generateBlockers = useMemo<string[]>(() => {
+    const list: string[] = [];
+    if (!loadedFiles.length) {
+      list.push('上传学生名单');
+      return list;
+    }
+    if (format === 'single-sheet' && (nameColumn === null || classColumn === null)) {
+      list.push('选择姓名列和班级列');
+    } else if (recognition === null) {
+      list.push('等待班级识别');
+    } else if (recognition.mode === 'none') {
+      list.push('检查文件格式（未能识别班级）');
+    }
+    if (classroomCount <= 0) list.push('设置考场数量');
+    if (seatCount <= 0) list.push('设置每个考场座位数');
+    if (!examConfig.components.some((c) => c.enabled)) {
+      list.push('勾选考号构成项');
+    }
+    const prefixComp = examConfig.components.find((c) => c.type === 'prefix');
+    if (prefixComp && prefixComp.enabled && !prefixComp.value.trim()) {
+      list.push('填写前缀内容');
+    }
+    return list;
+  }, [
+    loadedFiles,
+    format,
+    nameColumn,
+    classColumn,
+    recognition,
+    classroomCount,
+    seatCount,
+    examConfig,
+  ]);
 
   // ---- 生成 ----
   const generate = useCallback(async () => {
@@ -570,6 +691,8 @@ export function useExamSystem() {
     onFilesSelected,
     generate,
     showStatus,
+    // 生成前置检查（空数组 = 可生成）
+    generateBlockers,
     currentPending,
     usedSeats,
     seatOptionsForRoom,
